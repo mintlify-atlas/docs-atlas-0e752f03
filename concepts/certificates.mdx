@@ -1,0 +1,227 @@
+---
+title: Certificates
+description: Understanding Apple Developer certificates in Impactor
+---
+
+Apple Developer certificates are cryptographic credentials that prove your identity when signing iOS applications. They're essential for sideloading apps to your device.
+
+## What is a certificate?
+
+A certificate is a digital document that contains:
+- Your public key
+- Your Apple Developer identity information
+- Apple's signature verifying the certificate is legitimate
+- An expiration date
+- A unique serial number
+
+When combined with your private key, a certificate allows you to sign iOS applications that your device will trust.
+
+## Certificate types
+
+Impactor uses **iOS Development Certificates** for sideloading:
+
+<CardGroup cols={2}>
+  <Card title="Development Certificate" icon="code">
+    - Used for testing apps on your devices
+    - Lasts **365 days**
+    - Can sign apps for registered devices only
+    - Created automatically by Impactor
+  </Card>
+  
+  <Card title="Distribution Certificate" icon="globe">
+    - Used for App Store submissions
+    - Not used by Impactor
+    - Requires paid developer account
+    - Can sign apps for public release
+  </Card>
+</CardGroup>
+
+## Certificate lifecycle
+
+<Steps>
+  <Step title="Key generation">
+    Impactor generates a 2048-bit RSA private key on your machine:
+    
+    ```rust
+    let priv_key = RsaPrivateKey::new(&mut OsRng, 2048)?;
+    ```
+    
+    This key never leaves your computer and is stored securely.
+  </Step>
+
+  <Step title="CSR creation">
+    A Certificate Signing Request (CSR) is created containing:
+    - Your public key (derived from the private key)
+    - Distinguished Name information (Country, State, Organization)
+    - A unique machine ID
+    
+    ```rust
+    let mut params = rcgen::CertificateParams::new(vec![]);
+    params.alg = &PKCS_RSA_SHA256;
+    let cert_csr = rcgen::Certificate::from_params(params)?.serialize_request_pem()?;
+    ```
+  </Step>
+
+  <Step title="Apple signature">
+    The CSR is submitted to Apple's servers:
+    
+    ```rust
+    pub async fn qh_submit_cert_csr(
+        &self,
+        team_id: &String,
+        csr_data: String,
+        machine_name: &String,
+    ) -> Result<CsrResponse, Error>
+    ```
+    
+    Apple signs your public key with their private key, creating a trusted certificate.
+  </Step>
+
+  <Step title="Certificate retrieval">
+    The signed certificate is downloaded and matched with your stored private key.
+    
+    Impactor verifies the certificate matches by comparing public keys:
+    ```rust
+    let pub_key_der_obj = priv_key.to_public_key().to_pkcs1_der()?.as_bytes().to_vec();
+    let parsed_cert = X509Certificate::from_der(&cert.cert_content)?;
+    if pub_key_der_obj == parsed_cert.public_key_data().as_ref() {
+        // Certificate matches!
+    }
+    ```
+  </Step>
+</Steps>
+
+## Certificate storage
+
+Certificates and keys are stored in your Impactor configuration directory:
+
+```
+~/.config/plume_impactor/keys/<team_id>/
+  └── key.pem          # Your private key (NEVER share this)
+```
+
+<Warning>
+  **Never share your private key** (`key.pem`). Anyone with access to this file can sign apps as you and access your Apple Developer account credentials.
+</Warning>
+
+The certificate itself is fetched from Apple's servers when needed, so only the private key needs to be stored locally.
+
+## Certificate limits
+
+<Tabs>
+  <Tab title="Free Account">
+    Free Apple Developer accounts have strict certificate limits:
+    
+    - Maximum of **2-3 active certificates** at once
+    - Each certificate lasts 365 days
+    - When limit is reached, an old certificate must be revoked
+    
+    <Info>
+      Impactor automatically handles certificate limits by revoking old certificates when creating new ones:
+      
+      ```rust
+      if matches!(&e, Error::DeveloperApi { result_code, .. } if *result_code == 7460) {
+          // Error 7460 = too many certificates
+          for cid in &cert_serial_numbers {
+              if session.qh_revoke_cert(&team_id, cid).await.is_ok() {
+                  log::warn!("Revoked certificate with serial number {}", cid);
+                  revoked_any = true;
+                  break;
+              }
+          }
+      }
+      ```
+    </Info>
+  </Tab>
+  
+  <Tab title="Paid Account">
+    Paid Apple Developer accounts have generous limits:
+    
+    - Multiple certificates allowed
+    - Same 365-day expiration
+    - More control over certificate management
+  </Tab>
+</Tabs>
+
+## Certificate identification
+
+Each certificate has several identifying properties:
+
+```rust
+pub struct Cert {
+    pub name: String,                    // Human-readable name
+    pub certificate_id: String,          // Apple's internal ID
+    pub serial_number: String,           // Unique serial number
+    pub status: String,                  // "Issued" or "Revoked"
+    pub expiration_date: Date,           // When it expires
+    pub machine_id: Option<String>,      // Machine that created it
+    pub machine_name: Option<String>,    // "AltStore" or custom name
+}
+```
+
+The machine name defaults to "AltStore" for compatibility with other sideloading tools:
+```rust
+pub(crate) const MACHINE_NAME: &str = "AltStore";
+```
+
+## P12 export format
+
+Impactor can export your certificate and private key as a P12 file for use with other tools:
+
+<AccordionGroup>
+  <Accordion title="What is P12?">
+    P12 (PKCS#12) is a binary format that bundles:
+    - Your certificate
+    - Your private key
+    - Optional password protection
+    
+    This format is used by:
+    - SideStore / AltStore for wireless signing
+    - LiveContainer for app management
+    - Other iOS sideloading tools
+  </Accordion>
+
+  <Accordion title="How Impactor creates P12 files">
+    ```rust
+    pub fn create_pkcs12(&self, data: &[Vec<u8>; 2], is_export: bool) -> Option<Vec<u8>> {
+        let cert_der = pem::parse(&data[0]).ok()?.contents().to_vec();
+        let key_der = pem::parse(&data[1]).ok()?.contents().to_vec();
+        
+        let cert = p12_keystore::Certificate::from_der(&cert_der).ok()?;
+        let key_chain = p12_keystore::PrivateKeyChain::new(key_der, local_key_id, vec![cert]);
+        
+        let password = if is_export {
+            "".to_string()  // Empty password for exports
+        } else {
+            self.machine_id.as_deref().unwrap_or("").to_string()  // Machine ID for SideStore
+        };
+        
+        keystore.writer(&password).write().ok()
+    }
+    ```
+    
+    When exporting for manual use, no password is set. When generating for SideStore, the machine ID is used as the password.
+  </Accordion>
+</AccordionGroup>
+
+## Multi-machine usage
+
+If you use Impactor on multiple computers:
+
+<Steps>
+  <Step title="Copy your private key">
+    Transfer `~/.config/plume_impactor/keys/<team_id>/key.pem` from your primary machine to the same location on other machines.
+  </Step>
+  
+  <Step title="Impactor detects the key">
+    Impactor will automatically use the existing key and find the matching certificate from Apple's servers.
+  </Step>
+  
+  <Step title="Same certificate everywhere">
+    All your machines will use the same certificate, avoiding certificate limit issues.
+  </Step>
+</Steps>
+
+<Note>
+  Without copying the key, each machine will create its own certificate, counting against your certificate limit and potentially causing issues if you exceed the maximum.
+</Note>

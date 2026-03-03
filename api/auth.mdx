@@ -1,0 +1,223 @@
+---
+title: Authentication API
+description: Apple ID authentication and session management with plume_core::auth
+---
+
+The authentication module provides functionality for logging into Apple accounts using the SRP (Secure Remote Password) protocol and managing authentication tokens.
+
+## Account struct
+
+```rust
+pub struct Account {
+    pub anisette: Arc<Mutex<AnisetteData>>,
+    pub spd: Option<plist::Dictionary>,
+    pub client: Client,
+}
+```
+
+Represents an authenticated Apple ID session.
+
+### Creating an account
+
+<CodeGroup>
+```rust Login with credentials
+use plume_core::auth::Account;
+use omnisette::AnisetteConfiguration;
+
+let config = AnisetteConfiguration::default();
+
+let account = Account::login(
+    || Ok(("user@example.com".to_string(), "password".to_string())),
+    || Ok("123456".to_string()),  // 2FA code
+    config
+).await?;
+```
+
+```rust With existing anisette
+use plume_core::auth::{Account, anisette_data::AnisetteData};
+
+let anisette = AnisetteData::new(config).await?;
+let account = Account::new_with_anisette(anisette)?;
+```
+</CodeGroup>
+
+### Methods
+
+<ParamField path="new" type="async fn">
+  ```rust
+  pub async fn new(config: AnisetteConfiguration) -> Result<Self, Error>
+  ```
+  Creates a new account instance with anisette data
+</ParamField>
+
+<ParamField path="login" type="async fn">
+  ```rust
+  pub async fn login(
+      appleid_closure: impl Fn() -> Result<(String, String), String>,
+      tfa_closure: impl Fn() -> Result<String, String>,
+      config: AnisetteConfiguration,
+  ) -> Result<Account, Error>
+  ```
+  
+  Authenticates with Apple ID credentials. The closures are called when credentials or 2FA codes are needed.
+
+  <Expandable title="Parameters">
+    <ParamField path="appleid_closure" type="closure">
+      Returns `(username, password)` tuple
+    </ParamField>
+    <ParamField path="tfa_closure" type="closure">
+      Returns the two-factor authentication code when required
+    </ParamField>
+    <ParamField path="config" type="AnisetteConfiguration">
+      Configuration for anisette data generation
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="login_email_pass" type="async fn">
+  ```rust
+  pub async fn login_email_pass(
+      &mut self,
+      username: &str,
+      password: &str,
+  ) -> Result<LoginState, Error>
+  ```
+  
+  Attempts to log in with email and password. Returns the current login state.
+</ParamField>
+
+<ParamField path="get_app_token" type="async fn">
+  ```rust
+  pub async fn get_app_token(&self, app: &str) -> Result<AppToken, Error>
+  ```
+  
+  Retrieves an app-specific authentication token (e.g., "com.apple.gs.xcode.auth")
+</ParamField>
+
+<ParamField path="get_name" type="fn">
+  ```rust
+  pub fn get_name(&self) -> (String, String)
+  ```
+  
+  Returns `(first_name, last_name)` from the authenticated session
+</ParamField>
+
+<ParamField path="get_pet" type="fn">
+  ```rust
+  pub fn get_pet(&self) -> Option<String>
+  ```
+  
+  Retrieves the PET (Profile Exchange Token) from the session
+</ParamField>
+
+## Login state
+
+```rust
+pub enum LoginState {
+    LoggedIn,
+    NeedsDevice2FA,
+    Needs2FAVerification,
+    NeedsSMS2FA,
+    NeedsSMS2FAVerification(VerifyBody),
+    NeedsExtraStep(String),
+    NeedsLogin,
+}
+```
+
+Represents the current state of the authentication flow.
+
+<Expandable title="State descriptions">
+  <ResponseField name="LoggedIn" type="unit">
+    Authentication completed successfully
+  </ResponseField>
+  
+  <ResponseField name="NeedsDevice2FA" type="unit">
+    Two-factor authentication code sent to trusted devices
+  </ResponseField>
+  
+  <ResponseField name="Needs2FAVerification" type="unit">
+    Waiting for 2FA code verification
+  </ResponseField>
+  
+  <ResponseField name="NeedsSMS2FA" type="unit">
+    SMS two-factor authentication required
+  </ResponseField>
+  
+  <ResponseField name="NeedsSMS2FAVerification" type="VerifyBody">
+    Waiting for SMS 2FA code verification
+  </ResponseField>
+  
+  <ResponseField name="NeedsExtraStep" type="String">
+    Additional authentication step required (e.g., security questions)
+  </ResponseField>
+</Expandable>
+
+## App token
+
+```rust
+pub struct AppToken {
+    pub app_tokens: plist::Dictionary,
+    pub auth_token: String,
+    pub app: String,
+}
+```
+
+Contains authentication tokens for specific Apple services.
+
+## Two-factor authentication
+
+### Trusted phone numbers
+
+```rust
+pub struct TrustedPhoneNumber {
+    pub number_with_dial_code: String,
+    pub last_two_digits: String,
+    pub push_mode: String,
+    pub id: u32,
+}
+```
+
+### Authentication extras
+
+```rust
+pub struct AuthenticationExtras {
+    pub trusted_phone_numbers: Vec<TrustedPhoneNumber>,
+    pub recovery_url: Option<String>,
+    pub cant_use_phone_number_url: Option<String>,
+    pub dont_have_access_url: Option<String>,
+    pub recovery_web_url: Option<String>,
+    pub repair_phone_number_url: Option<String>,
+    pub repair_phone_number_web_url: Option<String>,
+}
+```
+
+## Example: Full authentication flow
+
+<CodeGroup>
+```rust Complete example
+use plume_core::auth::Account;
+use omnisette::AnisetteConfiguration;
+
+#[tokio::main]
+async fn main() -> Result<(), plume_core::Error> {
+    let config = AnisetteConfiguration::default();
+    
+    let account = Account::login(
+        || {
+            // Prompt user for credentials
+            Ok(("user@icloud.com".to_string(), "password".to_string()))
+        },
+        || {
+            // Prompt user for 2FA code
+            Ok("123456".to_string())
+        },
+        config
+    ).await?;
+    
+    let (first_name, last_name) = account.get_name();
+    println!("Logged in as: {} {}", first_name, last_name);
+    
+    Ok(())
+}
+```
+</CodeGroup>

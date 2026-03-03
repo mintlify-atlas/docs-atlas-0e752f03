@@ -1,0 +1,369 @@
+---
+title: Device API
+description: Manage iOS devices and install apps with plume_utils::Device
+---
+
+The `Device` struct provides functionality for communicating with iOS devices over USB or Wi-Fi, including app installation, profile management, and device pairing.
+
+## Device struct
+
+```rust
+pub struct Device {
+    pub name: String,
+    pub udid: String,
+    pub device_id: u32,
+    pub usbmuxd_device: Option<UsbmuxdDevice>,
+    pub is_mac: bool,
+}
+```
+
+<ParamField path="name" type="String">
+  Device name (e.g., "iPhone 13 Pro")
+</ParamField>
+
+<ParamField path="udid" type="String">
+  Unique Device IDentifier
+</ParamField>
+
+<ParamField path="device_id" type="u32">
+  Usbmuxd device ID for communication
+</ParamField>
+
+<ParamField path="is_mac" type="bool">
+  True if the device is a Mac (only for manually added devices)
+</ParamField>
+
+## Getting devices
+
+<ParamField path="new" type="async fn">
+  ```rust
+  pub async fn new(usbmuxd_device: UsbmuxdDevice) -> Self
+  ```
+  
+  Creates a Device from a UsbmuxdDevice
+</ParamField>
+
+<ParamField path="get_device_for_id" type="async fn">
+  ```rust
+  pub async fn get_device_for_id(device_id: &str) -> Result<Device, Error>
+  ```
+  
+  Finds a connected device by its device ID
+</ParamField>
+
+<CodeGroup>
+```rust Example
+use plume_utils::get_device_for_id;
+
+let device = get_device_for_id("12345").await?;
+println!("Connected to: {} ({})", device.name, device.udid);
+```
+
+```rust List all devices
+use idevice::usbmuxd::UsbmuxdConnection;
+use plume_utils::Device;
+
+let mut usbmuxd = UsbmuxdConnection::default().await?;
+let devices = usbmuxd.get_devices().await?;
+
+for usbmuxd_device in devices {
+    let device = Device::new(usbmuxd_device).await;
+    println!("{}", device);  // Uses Display trait
+}
+```
+</CodeGroup>
+
+## Display format
+
+```rust
+impl Display for Device
+```
+
+Formats as: `[USB/WiFi/LOCAL] Device Name`
+
+<CodeGroup>
+```rust Example output
+[USB] iPhone 13 Pro
+[WiFi] iPad Air
+[LOCAL] MacBook Pro
+```
+</CodeGroup>
+
+## App management
+
+### install_app
+
+```rust
+pub async fn install_app<F, Fut>(
+    &self,
+    app_path: &PathBuf,
+    progress_callback: F,
+) -> Result<(), Error>
+where
+    F: FnMut(i32) -> Fut + Send + Clone + 'static,
+    Fut: std::future::Future<Output = ()> + Send,
+```
+
+Installs an app bundle to the device with progress reporting.
+
+<CodeGroup>
+```rust Example
+use std::path::PathBuf;
+
+let app_path = PathBuf::from("/path/to/App.app");
+
+device.install_app(
+    &app_path,
+    |progress| async move {
+        println!("Installation progress: {}%", progress);
+    }
+).await?;
+
+println!("App installed successfully!");
+```
+
+```rust With progress bar
+use indicatif::ProgressBar;
+
+let pb = ProgressBar::new(100);
+
+device.install_app(
+    &app_path,
+    move |progress| {
+        let pb = pb.clone();
+        async move {
+            pb.set_position(progress as u64);
+        }
+    }
+).await?;
+
+pb.finish_with_message("Installation complete");
+```
+</CodeGroup>
+
+### installed_apps
+
+```rust
+pub async fn installed_apps(&self) -> Result<Vec<SignerAppReal>, Error>
+```
+
+Returns a list of installed user apps that support pairing files.
+
+<CodeGroup>
+```rust Example
+let apps = device.installed_apps().await?;
+
+for app in apps {
+    println!("Found app: {:?}", app.app);
+    if let Some(bundle_id) = app.bundle_id {
+        println!("  Bundle ID: {}", bundle_id);
+    }
+}
+```
+</CodeGroup>
+
+### is_app_installed
+
+```rust
+pub async fn is_app_installed(&self, bundle_id: &str) -> Result<bool, Error>
+```
+
+Checks if an app with the given bundle identifier is installed.
+
+<CodeGroup>
+```rust Example
+if device.is_app_installed("com.example.myapp").await? {
+    println!("App is already installed");
+} else {
+    println!("App needs to be installed");
+}
+```
+</CodeGroup>
+
+## Provisioning profiles
+
+### install_profile
+
+```rust
+pub async fn install_profile(
+    &self,
+    profile: &MobileProvision
+) -> Result<(), Error>
+```
+
+Installs a provisioning profile on the device.
+
+<CodeGroup>
+```rust Example
+use plume_core::MobileProvision;
+
+let profile_data = tokio::fs::read("profile.mobileprovision").await?;
+let profile = MobileProvision::load_with_bytes(profile_data)?;
+
+device.install_profile(&profile).await?;
+println!("Profile installed");
+```
+</CodeGroup>
+
+## Device pairing
+
+### pair
+
+```rust
+pub async fn pair(&self) -> Result<(), Error>
+```
+
+Pairs with the device and saves the pairing record. Requires the device to be unlocked and "Trust This Computer" to be accepted.
+
+<CodeGroup>
+```rust Example
+device.pair().await?;
+println!("Device paired successfully");
+```
+</CodeGroup>
+
+### install_pairing_record
+
+```rust
+pub async fn install_pairing_record(
+    &self,
+    identifier: &String,
+    path: &str,
+) -> Result<(), Error>
+```
+
+Installs a pairing record file to an app's document directory. Used for sideloading apps like SideStore and Feather.
+
+<ParamField path="identifier" type="&String">
+  Bundle identifier of the target app
+</ParamField>
+
+<ParamField path="path" type="&str">
+  Path within the app's Documents directory
+</ParamField>
+
+<CodeGroup>
+```rust Example: SideStore
+device.install_pairing_record(
+    &"com.SideStore.SideStore".to_string(),
+    "/Documents/ALTPairingFile.mobiledevicepairing"
+).await?;
+```
+
+```rust Example: Feather
+device.install_pairing_record(
+    &"com.samgisaninja.feather".to_string(),
+    "/Documents/pairingFile.plist"
+).await?;
+```
+</CodeGroup>
+
+## macOS installation
+
+### install_app_mac
+
+```rust
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+pub async fn install_app_mac(app_path: &PathBuf) -> Result<(), Error>
+```
+
+Installs an iOS app on Apple Silicon Macs. Creates the required wrapper structure:
+
+```
+App.app/
+├── WrappedBundle -> Wrapper/App.app
+└── Wrapper/
+    └── App.app/
+```
+
+Installs to `/Applications/iOS/`.
+
+<CodeGroup>
+```rust Example (Apple Silicon Mac only)
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+{
+    use plume_utils::install_app_mac;
+    use std::path::PathBuf;
+    
+    let app_path = PathBuf::from("/path/to/App.app");
+    install_app_mac(&app_path).await?;
+    println!("App installed to /Applications/iOS/");
+}
+```
+</CodeGroup>
+
+## Complete example
+
+<CodeGroup>
+```rust Full workflow
+use plume_utils::{Device, get_device_for_id};
+use plume_core::MobileProvision;
+use std::path::PathBuf;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 1. Find device
+    let device = get_device_for_id("12345").await?;
+    println!("Found device: {}", device);
+    
+    // 2. Check if already paired
+    // (will fail on first run, prompting trust dialog)
+    match device.pair().await {
+        Ok(_) => println!("Device paired"),
+        Err(e) => println!("Pairing error (may already be paired): {}", e),
+    }
+    
+    // 3. Install provisioning profile
+    let profile_data = tokio::fs::read("profile.mobileprovision").await?;
+    let profile = MobileProvision::load_with_bytes(profile_data)?;
+    device.install_profile(&profile).await?;
+    
+    // 4. Check if app is already installed
+    let bundle_id = "com.example.myapp";
+    if device.is_app_installed(bundle_id).await? {
+        println!("App already installed, will replace");
+    }
+    
+    // 5. Install app with progress
+    let app_path = PathBuf::from("/path/to/MyApp.app");
+    device.install_app(
+        &app_path,
+        |progress| async move {
+            if progress % 10 == 0 {
+                println!("Installation: {}%", progress);
+            }
+        }
+    ).await?;
+    
+    println!("✓ App installed successfully!");
+    
+    // 6. Install pairing file for auto-refresh (if SideStore)
+    if bundle_id.contains("SideStore") {
+        device.install_pairing_record(
+            &bundle_id.to_string(),
+            "/Documents/ALTPairingFile.mobiledevicepairing"
+        ).await?;
+        println!("✓ Pairing file installed for auto-refresh");
+    }
+    
+    Ok(())
+}
+```
+</CodeGroup>
+
+## Error handling
+
+Common errors when working with devices:
+
+<CodeGroup>
+```rust Handle common errors
+match device.install_app(&app_path, |_| async {}).await {
+    Ok(_) => println!("Success"),
+    Err(plume_utils::Error::Idevice(e)) => {
+        eprintln!("Device communication error: {}", e);
+        eprintln!("Make sure device is unlocked and trusted");
+    }
+    Err(e) => eprintln!("Installation failed: {}", e),
+}
+```
+</CodeGroup>

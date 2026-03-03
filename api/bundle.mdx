@@ -1,0 +1,342 @@
+---
+title: Bundle API
+description: Parse and modify iOS app bundles with plume_utils::Bundle
+---
+
+The `Bundle` struct provides utilities for parsing, inspecting, and modifying iOS application bundles (.app directories).
+
+## Bundle struct
+
+```rust
+pub struct Bundle {
+    bundle_dir: PathBuf,
+    bundle_type: BundleType,
+    info_plist_path: PathBuf,
+}
+```
+
+Represents an iOS app bundle with its Info.plist and associated resources.
+
+## Creating a bundle
+
+```rust
+pub fn new<P: Into<PathBuf>>(bundle_path: P) -> Result<Self, Error>
+```
+
+Creates a Bundle instance from a path. The path must contain a valid Info.plist file.
+
+<CodeGroup>
+```rust Example
+use plume_utils::Bundle;
+use std::path::PathBuf;
+
+let bundle = Bundle::new("/path/to/MyApp.app")?;
+let bundle = Bundle::new(PathBuf::from("/Applications/App.app"))?;
+```
+</CodeGroup>
+
+## Bundle types
+
+```rust
+pub enum BundleType {
+    App,
+    AppExtension,
+    Framework,
+    Dylib,
+    Unknown,
+}
+```
+
+Determined from the file extension:
+- `.app` → `BundleType::App`
+- `.appex` → `BundleType::AppExtension`
+- `.framework` → `BundleType::Framework`
+- `.dylib` → `BundleType::Dylib`
+
+<ParamField path="should_have_entitlements" type="fn">
+  ```rust
+  pub fn should_have_entitlements(&self) -> bool
+  ```
+  
+  Returns true for App and AppExtension types
+</ParamField>
+
+<ParamField path="should_be_signed" type="fn">
+  ```rust
+  pub fn should_be_signed(&self) -> bool
+  ```
+  
+  Returns true for all types except Unknown
+</ParamField>
+
+## Accessors
+
+<ParamField path="bundle_dir" type="fn">
+  ```rust
+  pub fn bundle_dir(&self) -> &PathBuf
+  ```
+  
+  Returns the bundle's directory path
+</ParamField>
+
+<ParamField path="bundle_type" type="fn">
+  ```rust
+  pub fn bundle_type(&self) -> &BundleType
+  ```
+  
+  Returns the bundle type
+</ParamField>
+
+## Discovering nested bundles
+
+<ParamField path="collect_nested_bundles" type="fn">
+  ```rust
+  pub fn collect_nested_bundles(&self) -> Result<Vec<Bundle>, Error>
+  ```
+  
+  Recursively finds all nested bundles (app extensions, frameworks, dylibs)
+</ParamField>
+
+<ParamField path="collect_bundles_sorted" type="fn">
+  ```rust
+  pub fn collect_bundles_sorted(&self) -> Result<Vec<Bundle>, Error>
+  ```
+  
+  Returns all bundles sorted by depth (deepest first). Used for signing in the correct order.
+</ParamField>
+
+<CodeGroup>
+```rust Example
+let bundle = Bundle::new("/path/to/App.app")?;
+let all_bundles = bundle.collect_bundles_sorted()?;
+
+for b in all_bundles {
+    println!("Bundle: {:?} - {:?}", b.bundle_dir(), b.bundle_type());
+}
+```
+</CodeGroup>
+
+## Info.plist methods
+
+These methods read and modify the bundle's Info.plist file.
+
+### Reading values
+
+Implements `PlistInfoTrait`:
+
+<ParamField path="get_name" type="fn">
+  ```rust
+  pub fn get_name(&self) -> Option<String>
+  ```
+  
+  Returns CFBundleDisplayName or CFBundleName
+</ParamField>
+
+<ParamField path="get_executable" type="fn">
+  ```rust
+  pub fn get_executable(&self) -> Option<String>
+  ```
+  
+  Returns CFBundleExecutable
+</ParamField>
+
+<ParamField path="get_bundle_identifier" type="fn">
+  ```rust
+  pub fn get_bundle_identifier(&self) -> Option<String>
+  ```
+  
+  Returns CFBundleIdentifier
+</ParamField>
+
+<ParamField path="get_bundle_name" type="fn">
+  ```rust
+  pub fn get_bundle_name(&self) -> Option<String>
+  ```
+  
+  Returns CFBundleName
+</ParamField>
+
+<ParamField path="get_version" type="fn">
+  ```rust
+  pub fn get_version(&self) -> Option<String>
+  ```
+  
+  Returns CFBundleShortVersionString
+</ParamField>
+
+<ParamField path="get_build_version" type="fn">
+  ```rust
+  pub fn get_build_version(&self) -> Option<String>
+  ```
+  
+  Returns CFBundleVersion
+</ParamField>
+
+### Writing values
+
+<ParamField path="set_info_plist_key" type="fn">
+  ```rust
+  pub fn set_info_plist_key<V: Into<Value>>(
+      &self,
+      key: &str,
+      value: V
+  ) -> Result<(), Error>
+  ```
+  
+  Sets an arbitrary key in Info.plist
+</ParamField>
+
+<ParamField path="set_name" type="fn">
+  ```rust
+  pub fn set_name(&self, new_name: &str) -> Result<(), Error>
+  ```
+  
+  Sets both CFBundleDisplayName and CFBundleName
+</ParamField>
+
+<ParamField path="set_version" type="fn">
+  ```rust
+  pub fn set_version(&self, new_version: &str) -> Result<(), Error>
+  ```
+  
+  Sets both CFBundleShortVersionString and CFBundleVersion
+</ParamField>
+
+<ParamField path="set_bundle_identifier" type="fn">
+  ```rust
+  pub fn set_bundle_identifier(&self, new_identifier: &str) -> Result<(), Error>
+  ```
+  
+  Sets CFBundleIdentifier
+</ParamField>
+
+<ParamField path="set_matching_identifier" type="fn">
+  ```rust
+  pub fn set_matching_identifier(
+      &self,
+      old_identifier: &str,
+      new_identifier: &str,
+  ) -> Result<(), Error>
+  ```
+  
+  Replaces all occurrences of old_identifier with new_identifier in:
+  - CFBundleIdentifier
+  - WKCompanionAppBundleIdentifier
+  - NSExtension → NSExtensionAttributes → WKAppBundleIdentifier
+</ParamField>
+
+## Example: Reading bundle info
+
+<CodeGroup>
+```rust Inspect bundle
+use plume_utils::{Bundle, PlistInfoTrait};
+
+let bundle = Bundle::new("/path/to/App.app")?;
+
+if let Some(name) = bundle.get_name() {
+    println!("App name: {}", name);
+}
+
+if let Some(id) = bundle.get_bundle_identifier() {
+    println!("Bundle ID: {}", id);
+}
+
+if let Some(version) = bundle.get_version() {
+    println!("Version: {}", version);
+}
+
+if let Some(executable) = bundle.get_executable() {
+    println!("Executable: {}", executable);
+}
+```
+</CodeGroup>
+
+## Example: Modifying bundle
+
+<CodeGroup>
+```rust Modify Info.plist
+use plume_utils::Bundle;
+
+let bundle = Bundle::new("/path/to/App.app")?;
+
+// Change app name
+bundle.set_name("My Custom App")?;
+
+// Change version
+bundle.set_version("2.0.0")?;
+
+// Change bundle identifier
+bundle.set_bundle_identifier("com.example.newid")?;
+
+// Set custom key
+bundle.set_info_plist_key("UIFileSharingEnabled", true)?;
+bundle.set_info_plist_key("MinimumOSVersion", "14.0")?;
+```
+</CodeGroup>
+
+## Example: Updating identifiers across extensions
+
+<CodeGroup>
+```rust Change all bundle IDs
+let bundle = Bundle::new("/path/to/App.app")?;
+let old_id = bundle.get_bundle_identifier().unwrap();
+let new_id = format!("{}.customteam", old_id);
+
+// Update main app and all nested bundles
+let all_bundles = bundle.collect_bundles_sorted()?;
+for nested_bundle in all_bundles {
+    nested_bundle.set_matching_identifier(&old_id, &new_id)?;
+}
+```
+</CodeGroup>
+
+## Example: Processing all bundles
+
+<CodeGroup>
+```rust Sign all components
+use plume_utils::{Bundle, BundleType};
+
+let bundle = Bundle::new("/path/to/App.app")?;
+let bundles = bundle.collect_bundles_sorted()?;
+
+for b in &bundles {
+    match b.bundle_type() {
+        BundleType::App => {
+            println!("Main app: {:?}", b.bundle_dir());
+        }
+        BundleType::AppExtension => {
+            println!("Extension: {:?}", b.bundle_dir());
+        }
+        BundleType::Framework => {
+            println!("Framework: {:?}", b.bundle_dir());
+        }
+        BundleType::Dylib => {
+            println!("Dylib: {:?}", b.bundle_dir());
+        }
+        BundleType::Unknown => {}
+    }
+}
+```
+</CodeGroup>
+
+## Advanced: Working with nested structures
+
+<CodeGroup>
+```rust Find specific extension
+let bundle = Bundle::new("/path/to/App.app")?;
+let bundles = bundle.collect_nested_bundles()?;
+
+// Find watch extension
+let watch_ext = bundles.iter().find(|b| {
+    b.bundle_dir()
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|s| s.contains("Watch"))
+        .unwrap_or(false)
+});
+
+if let Some(watch) = watch_ext {
+    println!("Found watch extension: {:?}", watch.bundle_dir());
+}
+```
+</CodeGroup>

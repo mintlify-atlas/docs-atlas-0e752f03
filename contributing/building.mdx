@@ -1,0 +1,188 @@
+---
+title: Building Impactor
+description: Build instructions for macOS, Linux, and Windows platforms
+---
+
+Building Impactor can be complex due to platform-specific requirements. This guide covers all platforms and their unique specifications.
+
+## Prerequisites
+
+All platforms require these core dependencies:
+
+<CardGroup cols={2}>
+  <Card title="Rust" icon="rust" href="https://rustup.rs/">
+    Install the Rust toolchain using rustup
+  </Card>
+  <Card title="CMake" icon="hammer" href="https://cmake.org/download/">
+    Build system and C++ compiler required
+  </Card>
+</CardGroup>
+
+## Basic build commands
+
+Once dependencies are installed, use these commands to build and test:
+
+```bash
+# Building / testing GUI
+cargo run --bin plumeimpactor
+
+# Building / testing CLI
+cargo run --bin plumesign -- <args>
+```
+
+For production builds:
+
+```bash
+# Release build for both applications
+cargo build --bins --workspace --release
+```
+
+## Platform-specific requirements
+
+<Accordion title="Linux">
+  Linux builds require additional system libraries for GUI rendering and device communication.
+  
+  ### Ubuntu/Debian
+  
+  ```bash
+  sudo apt-get install libclang-dev pkg-config libgtk-3-dev \
+    libpng-dev libjpeg-dev libgl1-mesa-dev libglu1-mesa-dev \
+    libxkbcommon-dev libexpat1-dev libtiff-dev
+  ```
+  
+  ### Fedora/RHEL
+  
+  ```bash
+  sudo dnf install clang-devel pkg-config gtk3-devel \
+    libpng-devel libjpeg-devel mesa-libGL-devel mesa-libGLU-devel \
+    libxkbcommon-devel expat-devel libtiff-devel
+  ```
+  
+  ### Runtime requirements
+  
+  <Note>
+  On Linux, `usbmuxd` must be installed on your system. It comes with most popular distributions by default.
+  
+  Due to some distributions' [udev](https://man7.org/linux/man-pages/man7/udev.7.html) rules, `usbmuxd` may stop running after no devices are connected. You can mitigate this by plugging your phone in first, then restarting the app.
+  </Note>
+  
+  Some distributions (like Bazzite) may need you to run:
+  
+  ```bash
+  sudo update-crypto-policies
+  ```
+  
+  This ensures `usbmuxd` can detect devices properly.
+  
+  ### Building AppImage
+  
+  For distribution, you can build an AppImage:
+  
+  ```bash
+  make linux PROFILE=release APPIMAGE=1
+  ```
+</Accordion>
+
+<Accordion title="macOS">
+  macOS builds require Apple development tools.
+  
+  ### Requirements
+  
+  Install one of the following:
+  - [Xcode](https://developer.apple.com/xcode/) (full IDE)
+  - [Command Line Tools](https://developer.apple.com/download/all/) (lightweight option)
+  
+  ### Building universal binaries
+  
+  To create a universal binary (Apple Silicon + Intel):
+  
+  ```bash
+  # Build for both architectures
+  cargo build --bins --workspace --release --target aarch64-apple-darwin
+  cargo build --bins --workspace --release --target x86_64-apple-darwin
+  
+  # Create universal binary using Makefile
+  make macos BIN1=target/aarch64-apple-darwin/release/plumeimpactor \
+    BIN2=target/x86_64-apple-darwin/release/plumeimpactor \
+    BUNDLE=1 ARCH=universal
+  ```
+  
+  ### Creating DMG installer
+  
+  ```bash
+  brew install create-dmg
+  # See .github/workflows/build.yml for complete DMG creation steps
+  ```
+  
+  <Note>
+  The macOS-specific `plume_gestalt` crate provides wrapper functionality for `libMobileGestalt.dylib`, used to obtain your Mac's UDID for Apple Silicon sideloading.
+  </Note>
+</Accordion>
+
+<Accordion title="Windows">
+  Windows builds require Visual Studio build tools.
+  
+  ### Requirements
+  
+  Install both:
+  - [Visual Studio 2022 Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)
+  - Windows 10/11 SDK
+  
+  ### Cross-compilation from Linux
+  
+  You can cross-compile for Windows from Linux:
+  
+  ```bash
+  # Install mingw-w64
+  sudo apt-get update
+  sudo apt-get install -y mingw-w64
+  
+  # Add Windows target
+  rustup target add x86_64-pc-windows-gnu
+  
+  # Build
+  cargo build --bins --workspace --release --target x86_64-pc-windows-gnu
+  ```
+  
+  ### Creating installer
+  
+  On Windows, you can create an NSIS installer:
+  
+  ```powershell
+  # Install NSIS
+  choco install nsis.portable
+  
+  # Build installer (see package/windows/ for installer scripts)
+  makensis package/windows/installer.nsi
+  ```
+  
+  <Warning>
+  On Windows, [iTunes](https://support.apple.com/en-us/106372) must be downloaded so Impactor can use the drivers for interacting with Apple devices.
+  </Warning>
+</Accordion>
+
+## GitHub Actions reference
+
+The best reference for building on any platform is the GitHub Actions workflow at `.github/workflows/build.yml`. This file contains:
+
+- Complete build steps for all platforms
+- Cross-compilation configurations
+- Packaging and distribution steps
+- Code signing and notarization (macOS)
+- AppImage generation (Linux)
+- NSIS installer creation (Windows)
+
+## Build profiles
+
+Impactor uses optimized release profiles for smaller binaries:
+
+```toml
+[profile.release]
+codegen-units = 1           # reduces binary size by ~2%
+lto = true                  # reduces binary size by ~14%
+opt-level = "s"             # reduces binary size by ~25%
+panic = "abort"             # reduces binary size by ~50%
+strip = "symbols"           # reduces binary size by ~65%
+```
+
+These optimizations significantly reduce binary size while maintaining performance.

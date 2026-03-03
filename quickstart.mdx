@@ -1,80 +1,186 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick start
+description: Sideload your first iOS app with Impactor in minutes
 ---
 
-## Get started in three steps
+# Quick start
 
-Get your documentation site running locally and make your first customization.
+This guide will walk you through sideloading your first app with Impactor. You'll learn how to connect your device, sign in with your Apple ID, and install an app.
 
-### Step 1: Set up your local environment
+<Info>
+  Before starting, make sure you have [installed Impactor](/installation) for your platform.
+</Info>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## Prerequisites
 
-### Step 2: Deploy your changes
+- An iOS device running iOS 9.0 or later
+- A USB cable to connect your device
+- An Apple ID (free account works)
+- An `.ipa` file of the app you want to install
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Step-by-step guide
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Steps>
+  <Step title="Launch Impactor">
+    Open Impactor on your computer. You'll see the main interface with a clean, user-friendly design.
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    <Tip>
+      First time users will see an empty device list. This is normal—we'll connect your device in the next step.
+    </Tip>
+  </Step>
 
-### Step 3: Go live
+  <Step title="Connect your iOS device">
+    Connect your iOS device to your computer using a USB cable.
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    1. Plug in your device
+    2. On your iOS device, tap "Trust" when prompted
+    3. Enter your device passcode if requested
+    4. Impactor should automatically detect your device
 
-## Next steps
+    <Warning>
+      **Linux users:** If your device isn't detected, try plugging it in first, then restarting Impactor. See the [installation guide](/installation#linux) for troubleshooting.
+    </Warning>
+  </Step>
 
-Now that you have your docs running, explore these key features:
+  <Step title="Sign in with your Apple ID">
+    Impactor uses your Apple Account to request certificates and provisioning profiles from Apple, similar to how Xcode works.
 
-<CardGroup cols={2}>
+    1. Click on the sign-in option in Impactor
+    2. Enter your Apple ID email and password
+    3. Complete two-factor authentication if prompted
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+    <Info>
+      **How it works:** Impactor replicates what Xcode does by using your Apple Account to:
+      - Register your device with Apple's servers
+      - Request a signing certificate (valid for 365 days)
+      - Create provisioning profiles for your apps
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+      Without a paid developer account, you're limited to 7-day app validity and a limited number of apps/components.
+    </Info>
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+    <Warning>
+      Your Apple ID credentials are used only to authenticate with Apple's servers. Impactor stores your certificate locally for future use.
+    </Warning>
+  </Step>
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+  <Step title="Select an app to sideload">
+    Now you're ready to install your first app.
 
-</CardGroup>
+    1. Click the button to select an `.ipa` file
+    2. Navigate to your downloaded `.ipa` file and select it
+    3. Impactor will analyze the app and display information about it
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+    <Tip>
+      **Don't have an .ipa file?** You can:
+      - Use Impactor to install [SideStore](https://github.com/SideStore/SideStore) for managing apps
+      - Install [LiveContainer](https://github.com/LiveContainer/LiveContainer) for running iOS apps
+      - Download apps using tools like `ipatool`
+    </Tip>
+  </Step>
+
+  <Step title="Install the app">
+    Click the install button to begin the sideloading process.
+
+    Impactor will:
+    1. Register your app with Apple's servers
+    2. Request a provisioning profile with proper entitlements
+    3. Download the certificate and provisioning profile
+    4. Sign the app using `apple-codesign-rs`
+    5. Install the app on your device using `idevice`
+
+    <Info>
+      The process typically takes 30-60 seconds depending on the app size and your internet connection.
+    </Info>
+  </Step>
+
+  <Step title="Trust the app on your device">
+    After installation, you need to trust the certificate on your device:
+
+    1. On your iOS device, go to **Settings** > **General** > **VPN & Device Management**
+    2. Tap on your Apple ID under "Developer App"
+    3. Tap **Trust** and confirm
+
+    <Warning>
+      Apps signed with a free Apple ID expire after 7 days. You'll need to re-sign and reinstall them using Impactor.
+    </Warning>
+  </Step>
+
+  <Step title="Launch your app">
+    You're all set! Find the app on your home screen and launch it.
+
+    <Tip>
+      If the app crashes on launch, make sure you completed the trust step in Settings.
+    </Tip>
+  </Step>
+</Steps>
+
+## What's next?
+
+### Install SideStore for easier management
+
+Impactor supports properly installing [SideStore](https://github.com/SideStore/SideStore), which allows you to refresh apps wirelessly:
+
+1. Download the SideStore `.ipa` file
+2. Install it using Impactor following the steps above
+3. Impactor will automatically populate the pairing file for SideStore
+
+### Generate a pairing file
+
+Impactor can generate a pairing file for apps to communicate with your device remotely:
+
+1. Connect your device
+2. Go to the **Utilities** page in Impactor
+3. Click install for a supported app (SideStore, Feather, Antrag, etc.)
+4. The pairing file will be automatically generated and placed
+
+<Info>
+  **Supported apps for pairing files:**
+  - [SideStore](https://github.com/SideStore/SideStore) - Install iOS apps with your Apple ID
+  - [Feather](https://github.com/khcrysalis/Feather) - Install apps using raw certificates
+  - [Antrag](https://github.com/khcrysalis/Antrag) - List installed iOS apps
+  - [Protokolle](https://github.com/khcrysalis/Protokolle) - View system logs
+  - And many more!
+</Info>
+
+### Advanced features
+
+Impactor supports advanced features for power users:
+
+- **Tweak injection** - Inject `.deb` and `.dylib` files using ElleKit
+- **Framework support** - Add `.framework`, `.bundle`, and `.appex` directories
+- **Custom entitlements** - Request entitlements like `increased-memory-limit` for emulators
+- **AppSync support** - Install apps if you have AppSync installed
+- **P12 export** - Generate P12 certificates for SideStore/AltStore
+
+## Troubleshooting
+
+### Device not detected
+
+- **macOS/Windows:** Make sure your device is unlocked and you tapped "Trust"
+- **Linux:** Plug in your device first, then restart Impactor. Ensure `usbmuxd` is running
+- **All platforms:** Try a different USB cable or port
+
+### Installation failed
+
+- Make sure you're signed in with your Apple ID
+- Check that your device has enough storage space
+- Verify the `.ipa` file isn't corrupted
+- Try signing out and back in to refresh your certificates
+
+### App crashes on launch
+
+- Ensure you trusted the certificate in Settings > General > VPN & Device Management
+- Some apps may not work when sideloaded due to DRM or server-side checks
+
+### Certificate errors
+
+- If you've reached the app limit (3 apps), revoke certificates in Impactor settings
+- Your certificate is stored locally and lasts 365 days—copy it to other machines if needed
+
+## Need help?
+
+If you're still having issues:
+
+- Check the [GitHub issues](https://github.com/khcrysalis/PlumeImpactor/issues) for known problems
+- Review platform-specific notes in the [installation guide](/installation)
+- Visit the community for support and tips

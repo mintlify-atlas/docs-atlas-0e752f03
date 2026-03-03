@@ -1,0 +1,116 @@
+---
+title: "GUI application overview"
+description: "Learn about the Impactor GUI application features and interface"
+---
+
+The Impactor GUI application provides a user-friendly graphical interface for installing IPA files to iOS devices. Built with the Iced UI framework, it offers a modern, cross-platform desktop experience on macOS, Linux, and Windows.
+
+## Main features
+
+The GUI application includes several key screens and capabilities:
+
+<CardGroup cols={2}>
+
+<Card title="App installation" icon="download" href="/gui/sideloading-apps">
+  Install IPA and TIPA files to connected iOS devices with drag-and-drop support.
+</Card>
+
+<Card title="Device utilities" icon="wrench" href="/gui/device-utilities">
+  Manage pairing files, trust devices, and view installed apps.
+</Card>
+
+<Card title="Settings" icon="gear" href="/gui/settings">
+  Configure Apple accounts, signing options, and application preferences.
+</Card>
+
+<Card title="Auto-refresh" icon="rotate">
+  Automatically refresh app signatures before expiration (beta feature).
+</Card>
+
+</CardGroup>
+
+## Application interface
+
+The GUI is organized into distinct screens accessible through navigation:
+
+### Main screen
+
+The main screen provides:
+- **Drag-and-drop area** for IPA/TIPA files
+- **File picker** to browse and select app packages
+- **Quick access** to utilities and settings
+- Device selector in the top bar
+
+### Device management
+
+At the top of every screen, you'll find:
+- **Device dropdown** showing all connected iOS devices
+- **Settings button** for accessing configuration options
+- **Back navigation** when viewing secondary screens
+
+### System tray integration
+
+The application can run in the system tray, providing:
+- Quick access to refresh installed apps
+- Notification support for background operations
+- Show/hide window controls
+- Single-instance enforcement
+
+<Note>
+The application uses a single-instance lock to prevent multiple copies from running simultaneously. If you try to launch Impactor while it's already running, the existing instance will be brought to the foreground.
+</Note>
+
+## Platform-specific features
+
+### macOS
+- Native activation policy handling
+- Dock integration
+- Notification center support
+- Auto-launch on login
+
+### Linux
+- GTK-based system tray
+- Hardware acceleration with fallback to tiny-skia
+- Auto-start integration
+
+### Windows
+- Native system tray support
+- Auto-launch registry integration
+
+<Warning>
+macOS devices connected to the application are not supported for sideloading operations. Only iOS devices can be used for app installation.
+</Warning>
+
+## Getting started
+
+To begin using the GUI application:
+
+<Steps>
+
+<Step title="Launch Impactor">
+  Open the Impactor application. It will either show the main window or start in the system tray depending on your launch arguments.
+</Step>
+
+<Step title="Connect your device">
+  Connect your iOS device via USB. It will appear in the device dropdown at the top of the window.
+</Step>
+
+<Step title="Choose an action">
+  Select whether you want to install an app or access device utilities.
+</Step>
+
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Sideload apps" icon="download" href="/gui/sideloading-apps">
+  Learn how to install IPA files to your device.
+</Card>
+
+<Card title="Configure settings" icon="gear" href="/gui/settings">
+  Set up your Apple account and preferences.
+</Card>
+
+</CardGroup>

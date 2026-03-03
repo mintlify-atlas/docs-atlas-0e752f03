@@ -1,0 +1,125 @@
+---
+title: How it works
+description: Understanding the iOS sideloading process in Impactor
+---
+
+Impactor replicates what Xcode does to sideload apps, using your Apple Account to request certificates, provisioning profiles, and register devices directly from Apple's servers.
+
+## The sideloading process
+
+Apple acts as the provider of all necessary credentials for installing apps on your iOS device. Without a paid developer program membership, you're limited to 7-day app validity and a restricted number of apps and components.
+
+<Steps>
+  <Step title="Device registration">
+    When you first sideload an app, Impactor registers your iOS device with Apple's servers using its unique device identifier (UDID).
+    
+    The device information is sent to Apple's developer API:
+    ```rust
+    pub async fn qh_add_device(
+        &self,
+        team_id: &String,
+        device_name: &String,
+        device_udid: &String,
+    ) -> Result<DeviceResponse, Error>
+    ```
+  </Step>
+
+  <Step title="Certificate creation">
+    Impactor creates a development certificate that lasts **365 days**. The private key is stored locally in your configuration directory.
+    
+    <Note>
+      If you use Impactor on multiple machines, you'll need to copy the private key (`key.pem`) from `~/.config/plume_impactor/keys/<team_id>/` to maintain the same certificate. Otherwise, Impactor will create a new certificate on each machine.
+    </Note>
+
+    The certificate creation process:
+    - Generates a 2048-bit RSA private key
+    - Creates a Certificate Signing Request (CSR)
+    - Submits the CSR to Apple's developer API
+    - Receives and stores the signed certificate
+
+    <Warning>
+      Free developer accounts have a limit on the number of certificates. If you reach this limit, Impactor will automatically revoke an existing certificate to create a new one.
+    </Warning>
+  </Step>
+
+  <Step title="App registration">
+    Your app is registered with Apple using its bundle identifier. This creates an App ID in your developer account.
+    
+    ```rust
+    pub async fn qh_add_app_id(
+        &self,
+        team_id: &String,
+        name: &String,
+        identifier: &String,
+    ) -> Result<AppIDResponse, Error>
+    ```
+    
+    Impactor extracts entitlements from your app's binary to determine what capabilities it needs (like push notifications, iCloud, etc.).
+  </Step>
+
+  <Step title="Provisioning profile generation">
+    A provisioning profile is created that links together:
+    - Your certificate
+    - The registered App ID
+    - Your device UDID
+    - Requested entitlements
+    
+    This profile tells iOS that your device is authorized to run this specific app signed with your certificate.
+  </Step>
+
+  <Step title="App modifications">
+    Before signing, Impactor performs any necessary modifications:
+    - Injects tweaks (if specified)
+    - Changes the app name (if requested)
+    - Adds frameworks, bundles, or app extensions
+    - Merges entitlements from the binary with the provisioning profile
+  </Step>
+
+  <Step title="Code signing">
+    The app is signed using [apple-codesign-rs](https://github.com/indygreg/apple-platform-rs), which:
+    - Signs all executable binaries in the app bundle
+    - Signs frameworks, plugins, and extensions
+    - Embeds the provisioning profile
+    - Creates code signatures that iOS will verify
+  </Step>
+
+  <Step title="Installation">
+    Finally, Impactor uses [idevice](https://github.com/jkcoxson/idevice) to communicate with `installd` on your iOS device and install the signed app.
+  </Step>
+</Steps>
+
+## Free vs paid developer accounts
+
+<AccordionGroup>
+  <Accordion title="Free Apple Developer Account">
+    - Apps expire after **7 days** and need to be re-signed
+    - Limited to **3 apps** at a time
+    - Limited number of App IDs and certificates
+    - Cannot use certain entitlements (like push notifications)
+    - Certificates last 365 days but apps only last 7 days
+  </Accordion>
+
+  <Accordion title="Paid Apple Developer Program ($99/year)">
+    - Apps expire after **1 year**
+    - No limit on number of apps
+    - Access to all entitlements
+    - Can distribute apps via TestFlight
+    - Certificates and provisioning profiles last 1 year
+  </Accordion>
+</AccordionGroup>
+
+## Alternative installation methods
+
+<Info>
+  If you have [AppSync](https://github.com/akemin-dayo/AppSync) installed on a jailbroken device, Impactor can install apps without signing them. This bypasses all Apple restrictions on app validity and quantity.
+</Info>
+
+## Why certificates are stored locally
+
+The private key for your certificate must be kept secret and secure. Impactor stores it locally at:
+
+```
+~/.config/plume_impactor/keys/<team_id>/key.pem
+```
+
+This key is used to sign all your apps. Without it, you'd need to create a new certificate (counting against your certificate limit) every time you want to sign an app.

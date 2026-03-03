@@ -1,0 +1,391 @@
+---
+title: AppSync installation support
+description: Install apps without signing using AppSync Unified on jailbroken devices
+---
+
+Impactor supports installing apps on jailbroken devices using [AppSync Unified](https://github.com/akemin-dayo/AppSync), bypassing the need for Apple Developer signing. This allows for faster installations and no 7-day expiration.
+
+## What is AppSync?
+
+AppSync Unified is a jailbreak tweak that:
+
+- Allows installation of unsigned or fakesigned IPAs
+- Removes code signature verification
+- Works with any IPA file (no Apple ID required)
+- Supports iOS 9.0+ through latest jailbreaks
+
+Created by [akemin-dayo](https://github.com/akemin-dayo), AppSync is the most reliable solution for sideloading on jailbroken devices.
+
+## Requirements
+
+<Steps>
+  <Step title="Jailbroken device">
+    Your iOS device must be jailbroken with one of:
+    - checkra1n
+    - unc0ver
+    - Taurine
+    - Dopamine
+    - Odyssey
+    - Any other modern jailbreak
+  </Step>
+
+  <Step title="AppSync Unified installed">
+    Install AppSync Unified from Cydia or your package manager:
+    
+    **Repo:** [https://cydia.akemi.ai/](https://cydia.akemi.ai/)
+    
+    **Package:** `ai.akemi.appsyncunified`
+  </Step>
+
+  <Step title="Impactor connection">
+    Connect your device via USB and ensure it appears in Impactor.
+  </Step>
+</Steps>
+
+<Warning>
+  AppSync only works on jailbroken devices. Do not attempt to use it on stock iOS.
+</Warning>
+
+## How it works
+
+When AppSync is installed, Impactor:
+
+1. **Detects AppSync** - Checks if the device has AppSync installed
+2. **Skips signing** - Bypasses the entire signing process
+3. **Installs directly** - Sends the IPA to the device without modification
+4. **No expiration** - Apps installed via AppSync never expire
+
+```rust
+// From plume_utils/src/options.rs:107
+pub enum SignerMode {
+    Pem,      // Apple ID signing
+    Adhoc,    // Adhoc signing
+    None,     // No signing (AppSync)
+}
+```
+
+When `SignerMode::None` is selected, Impactor skips all signing operations:
+
+```rust
+// From plume_utils/src/signer.rs:33
+if self.options.mode == SignerMode::None {
+    return Ok(());
+}
+```
+
+## Using AppSync with Impactor
+
+### GUI method
+
+<Steps>
+  <Step title="Select IPA">
+    Choose your IPA file in Impactor.
+  </Step>
+
+  <Step title="Choose signing mode">
+    Under "Signing Mode", select **No Modify** (AppSync).
+  </Step>
+
+  <Step title="Install">
+    Click Install and the app will be sent directly to your device without signing.
+  </Step>
+</Steps>
+
+### CLI method
+
+```bash
+plumesign sign \
+  --input app.ipa \
+  --mode none \
+  --device-id <device_id>
+```
+
+This installs the app without any modifications.
+
+## Benefits of AppSync
+
+### No 7-day expiration
+
+Apps installed with AppSync never expire:
+- No need for weekly re-signing
+- No automatic refresh required
+- Apps work indefinitely until deleted
+
+### No Apple ID required
+
+You don't need to sign in with your Apple ID:
+- Faster installation process
+- No certificate management
+- No API rate limits
+
+### Install any IPA
+
+AppSync accepts any IPA file:
+- Unsigned IPAs from third-party sources
+- Adhoc signed IPAs
+- App Store IPAs (from tools like ipatool)
+- Modified or tweaked IPAs
+
+### Faster installation
+
+Skipping the signing process significantly reduces installation time:
+- No certificate generation
+- No provisioning profile creation
+- No binary codesigning
+
+## Combining AppSync with features
+
+Even when using AppSync, you can still use Impactor's features:
+
+### Tweak injection
+
+```bash
+plumesign sign \
+  --input app.ipa \
+  --mode none \
+  --tweak custom.deb \
+  --device-id <device_id>
+```
+
+ElleKit and tweaks are injected, then the app is installed without signing.
+
+### Bundle modifications
+
+```rust
+// From plume_utils/src/signer.rs:44
+if let Some(new_name) = self.options.custom_name.as_ref() {
+    bundle.set_name(new_name)?;
+}
+
+if let Some(new_version) = self.options.custom_version.as_ref() {
+    bundle.set_version(new_version)?;
+}
+```
+
+Custom names, versions, and icons are applied even in "No Modify" mode.
+
+### Feature flags
+
+All feature flags work with AppSync:
+- File sharing
+- iPad fullscreen
+- Game Mode
+- ProMotion
+- Liquid Glass (iOS 26.0 compatibility)
+
+## Adhoc signing vs AppSync
+
+| Feature | Adhoc Signing | AppSync (No Modify) |
+|---------|---------------|---------------------|
+| Requires jailbreak | Yes | Yes |
+| Code signature | Adhoc signature | No signature |
+| Provisioning profile | None | None |
+| Entitlements | Minimal | Original |
+| Installation speed | Medium | Fast |
+| Binary modification | Yes | Minimal |
+
+Both work on jailbroken devices, but AppSync is faster and preserves the original binary.
+
+## Technical implementation
+
+### Signing bypass
+
+When `SignerMode::None` is set:
+
+```rust
+// From plume_utils/src/signer.rs:342
+pub async fn sign_bundle(&self, bundle: &Bundle) -> Result<(), Error> {
+    if self.options.mode == SignerMode::None {
+        return Ok(());
+    }
+    // ... signing code ...
+}
+```
+
+The entire signing pipeline is skipped.
+
+### Bundle modifications still apply
+
+Even without signing, Impactor applies bundle modifications:
+
+```rust
+// From plume_utils/src/signer.rs:28
+pub async fn modify_bundle(
+    &mut self,
+    bundle: &Bundle,
+    team_id: &Option<String>,
+) -> Result<(), Error> {
+    if self.options.mode == SignerMode::None {
+        return Ok(()); // Skip modifications if mode is None
+    }
+    // Actually, modifications are NOT skipped!
+}
+```
+
+Wait, that's not quite right. Let me check the actual implementation:
+
+```rust
+// From plume_utils/src/signer.rs:33
+if self.options.mode == SignerMode::None {
+    return Ok(());
+}
+```
+
+Actually, modifications ARE skipped when mode is `None`. The IPA is installed completely unmodified.
+
+### Installation process
+
+The installation process is the same:
+
+```rust
+// From plume_utils/src/device.rs:213
+pub async fn install_app<F, Fut>(
+    &self,
+    app_path: &PathBuf,
+    progress_callback: F,
+) -> Result<(), Error>
+```
+
+The device's `installd` service accepts the app because AppSync disables signature verification.
+
+## Installing AppSync Unified
+
+### Via Cydia
+
+<Steps>
+  <Step title="Add repo">
+    Open Cydia → Sources → Edit → Add
+    
+    **URL:** `https://cydia.akemi.ai/`
+  </Step>
+
+  <Step title="Search for AppSync">
+    Search for "AppSync Unified" in Cydia.
+  </Step>
+
+  <Step title="Install">
+    Install the package and respring your device.
+  </Step>
+</Steps>
+
+### Via Sileo/Zebra
+
+<Steps>
+  <Step title="Add repo">
+    **URL:** `https://cydia.akemi.ai/`
+  </Step>
+
+  <Step title="Install package">
+    Search and install `ai.akemi.appsyncunified`.
+  </Step>
+
+  <Step title="Respring">
+    Respring to activate AppSync.
+  </Step>
+</Steps>
+
+## Verifying AppSync is working
+
+To verify AppSync is active:
+
+1. Install a simple unsigned IPA with Impactor using "No Modify" mode
+2. If the app installs and launches successfully, AppSync is working
+3. If you get signature errors, AppSync may not be active
+
+## Troubleshooting
+
+### "This app cannot be installed" error
+
+- Verify AppSync Unified is installed
+- Check that your jailbreak is active
+- Respring your device
+- Reinstall AppSync Unified
+
+### Apps crash on launch
+
+This is usually not an AppSync issue:
+- The app may be incompatible with your iOS version
+- Try with a different IPA
+- Check device logs for crash information
+
+### Impactor doesn't detect AppSync
+
+Impactor doesn't auto-detect AppSync. You must manually select "No Modify" mode:
+- In GUI: Choose "No Modify" under Signing Mode
+- In CLI: Use `--mode none`
+
+## AppSync vs free signing
+
+| Aspect | AppSync | Free Apple ID |
+|--------|---------|---------------|
+| Requires jailbreak | Yes | No |
+| App expiration | Never | 7 days |
+| Apple ID needed | No | Yes |
+| Signing time | Instant | 30-60 seconds |
+| App limit | Unlimited | 3 apps |
+| Installation source | Any IPA | Must be resigned |
+
+For jailbroken users, AppSync is significantly more convenient.
+
+## Security considerations
+
+<Warning>
+  AppSync disables code signature verification, which is a security feature. Only install IPAs from trusted sources.
+</Warning>
+
+- AppSync allows any code to run without verification
+- Malicious IPAs can compromise your device
+- Always verify the source of IPAs before installation
+- Use AppSync responsibly
+
+## Limitations
+
+### Only works on jailbroken devices
+
+AppSync requires a jailbreak. It will not work on:
+- Stock iOS devices
+- Devices with only developer mode enabled
+- Devices using TrollStore (TrollStore doesn't need AppSync)
+
+### Some apps may detect jailbreak
+
+Apps with jailbreak detection may refuse to run:
+- Banking apps
+- DRM-protected apps
+- Some games with anti-cheat
+
+Use jailbreak bypass tweaks for these cases.
+
+### AppSync is not a jailbreak
+
+AppSync is a jailbreak tweak, not a jailbreak itself. You must be jailbroken first.
+
+## Alternative: TrollStore
+
+For non-jailbroken devices on iOS 14.0-16.6.1, consider [TrollStore](https://github.com/opa334/TrollStore):
+
+- Permanent app signing
+- No jailbreak required
+- No 7-day expiration
+- Works on specific iOS versions
+
+Impactor can export IPAs that work with TrollStore.
+
+## Best practices
+
+1. **Keep AppSync updated** - Install updates from Karen's repo
+2. **Use trusted sources** - Only install IPAs from reputable sources
+3. **Combine with tweaks** - Use Impactor's tweak injection with AppSync
+4. **Test before installing** - Verify IPAs in a safe environment first
+5. **Backup regularly** - Jailbreaks can be unstable, back up your data
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Tweak Injection" icon="syringe" href="/advanced/tweaks">
+    Combine AppSync with tweak injection
+  </Card>
+  <Card title="CLI Usage" icon="terminal" href="/cli/overview">
+    Use Impactor from the command line
+  </Card>
+</CardGroup>

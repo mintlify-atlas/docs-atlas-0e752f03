@@ -1,0 +1,115 @@
+---
+title: plume_core
+description: Core functionality for iOS app signing and Apple Developer API integration
+---
+
+The `plume_core` crate provides the foundational functionality for interacting with Apple's authentication and developer services. It handles Apple ID authentication, certificate management, and communication with Apple's Developer API.
+
+## Overview
+
+This crate contains two primary modules:
+
+- **auth** - Apple ID authentication and token management
+- **developer** - Apple Developer API client for managing apps, devices, and provisioning
+
+## Re-exports
+
+The crate re-exports commonly used types from dependencies:
+
+```rust
+pub use apple_codesign::{
+    AppleCodesignError,
+    SettingsScope,
+    SigningSettings,
+    UnifiedSigner
+};
+
+pub use omnisette::AnisetteConfiguration;
+```
+
+## Utility types
+
+<ParamField path="CertificateIdentity" type="struct">
+  Represents a code signing certificate with private key and metadata
+</ParamField>
+
+<ParamField path="MachO" type="struct">
+  Parser and manipulator for Mach-O executable files
+</ParamField>
+
+<ParamField path="MobileProvision" type="struct">
+  Parser for Apple provisioning profiles (.mobileprovision files)
+</ParamField>
+
+## Error type
+
+All operations return `Result<T, plume_core::Error>` where the error type is defined as:
+
+```rust
+pub enum Error {
+    BundleExecutableMissing,
+    ProvisioningEntitlementsUnknown,
+    CertificatePemMissing,
+    Certificate(String),
+    DeveloperApi {
+        url: String,
+        result_code: i64,
+        http_code: Option<u16>,
+        message: String,
+    },
+    DeveloperSessionRequestFailed,
+    AuthSrpWithMessage(i64, String),
+    ExtraStep(String),
+    Bad2faCode,
+    Parse,
+    Io(std::io::Error),
+    Plist(plist::Error),
+    Codesign(AppleCodesignError),
+    // ... and more
+}
+```
+
+<Expandable title="Common error variants">
+  <ResponseField name="DeveloperApi" type="struct">
+    Error returned by Apple's Developer API with HTTP status code and error message
+  </ResponseField>
+
+  <ResponseField name="AuthSrpWithMessage" type="tuple">
+    Authentication error with error code and descriptive message
+  </ResponseField>
+
+  <ResponseField name="ExtraStep" type="string">
+    Additional authentication step required (e.g., two-factor authentication)
+  </ResponseField>
+
+  <ResponseField name="Bad2faCode" type="unit">
+    The provided two-factor authentication code was invalid
+  </ResponseField>
+</Expandable>
+
+## HTTP client
+
+```rust
+pub fn client() -> Result<reqwest::Client, Error>
+```
+
+Creates a configured HTTP client with Apple's root certificate for secure communication with Apple services.
+
+<CodeGroup>
+```rust Example
+use plume_core::client;
+
+let http_client = client()?;
+```
+</CodeGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/auth">
+    Learn about Apple ID authentication
+  </Card>
+  <Card title="Developer API" icon="code" href="/api/developer-api">
+    Manage apps and provisioning profiles
+  </Card>
+</CardGroup>

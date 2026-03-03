@@ -1,0 +1,81 @@
+---
+title: Contributing guidelines
+description: Learn how to contribute to Impactor while maintaining compatibility and integrity
+---
+
+Impactor is a sideloading app designed to work on stock iOS versions. To maintain compatibility and integrity, we have specific contribution rules and guidelines in place.
+
+## Contribution rules
+
+Before contributing to Impactor, please review these essential rules:
+
+<Warning>
+**Critical restrictions**
+- No usage of any exploits of any kind
+- No contributions related to retrieving any signing certificates owned by companies
+- Modifying any hardcoded links should be discussed before changing
+</Warning>
+
+<Note>
+**General guidelines**
+- If you're planning on making a large contribution, please [make an issue](https://github.com/khcrysalis/Impactor/issues) beforehand
+- Your contributions should be licensed appropriately
+- Typo contributions are okay, just make sure they are appropriate
+- Code cleaning contributions are okay
+</Note>
+
+## Making contributions
+
+When you're ready to contribute, follow these best practices:
+
+<Steps>
+  <Step title="Create a feature branch">
+    Make sure your contributions stay isolated in their own branch, and not `main`.
+    
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+  </Step>
+  
+  <Step title="Make your changes">
+    Implement your changes following the project's coding standards and architecture patterns.
+  </Step>
+  
+  <Step title="Test thoroughly">
+    Test your changes on all relevant platforms (macOS, Linux, Windows) if possible.
+    
+    ```bash
+    # Test the GUI
+    cargo run --bin plumeimpactor
+    
+    # Test the CLI
+    cargo run --bin plumesign -- <args>
+    ```
+  </Step>
+  
+  <Step title="Submit a pull request">
+    When contributing, don't be afraid of any reviewers requesting changes or judging how you wrote something. It's all to keep the project clean and tidy.
+  </Step>
+</Steps>
+
+## License requirements
+
+Contributions should be licensed appropriately to maintain compatibility with the project's MIT license. Some components may be licensed under different licenses:
+
+- **Main project**: MIT License
+- **plume_core**: MPL-2.0 (Mozilla Public License 2.0)
+- **ElleKit components**: See LICENSE_ELLEKIT
+
+When contributing to specific modules, ensure your code is compatible with the respective license.
+
+## Getting help
+
+If you have questions or need clarification:
+
+- Open an [issue on GitHub](https://github.com/khcrysalis/Impactor/issues) for feature discussions
+- Review existing issues and pull requests for similar contributions
+- Check the build workflow in `.github/workflows/build.yml` for platform-specific requirements
+
+## Code of conduct
+
+Contributions should be professional and constructive. Reviewers may request changes to maintain code quality and consistency. This feedback is essential for keeping the project maintainable and clean.

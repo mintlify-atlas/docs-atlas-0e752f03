@@ -1,0 +1,244 @@
+---
+title: Linux
+description: Install and use Impactor on Linux with usbmuxd support and AppImage or Flatpak distributions
+---
+
+Impactor provides full Linux support with native builds for both x86_64 and ARM64 architectures. The application requires `usbmuxd` for device communication.
+
+## Installation
+
+Impactor is available through multiple distribution methods on Linux.
+
+<Steps>
+  <Step title="Install via Flatpak (recommended)">
+    The easiest way to install Impactor is through Flathub:
+    
+    ```bash
+    flatpak install flathub dev.khcrysalis.PlumeImpactor
+    ```
+    
+    Launch Impactor:
+    ```bash
+    flatpak run dev.khcrysalis.PlumeImpactor
+    ```
+  </Step>
+  
+  <Step title="Install AppImage">
+    Download the AppImage from [GitHub releases](https://github.com/khcrysalis/PlumeImpactor/releases):
+    
+    ```bash
+    # Make it executable
+    chmod +x Impactor-linux-x86_64.appimage
+    
+    # Run Impactor
+    ./Impactor-linux-x86_64.appimage
+    ```
+  </Step>
+  
+  <Step title="Install binary directly">
+    Download and extract the binary:
+    
+    ```bash
+    # Download from releases
+    wget https://github.com/khcrysalis/PlumeImpactor/releases/latest/download/Impactor-linux-x86_64
+    
+    # Make it executable
+    chmod +x Impactor-linux-x86_64
+    
+    # Run Impactor
+    ./Impactor-linux-x86_64
+    ```
+  </Step>
+</Steps>
+
+## System requirements
+
+### Required packages
+
+<Warning>
+  `usbmuxd` must be installed on your system for Impactor to communicate with iOS devices. Most popular distributions include it by default.
+</Warning>
+
+Install usbmuxd if not already present:
+
+```bash
+# Ubuntu/Debian
+sudo apt install usbmuxd
+
+# Fedora/RHEL
+sudo dnf install usbmuxd
+
+# Arch Linux
+sudo pacman -S usbmuxd
+```
+
+### Supported architectures
+
+- **x86_64** (Intel/AMD 64-bit)
+- **aarch64** (ARM64)
+
+## Platform-specific limitations
+
+Linux has some known limitations compared to macOS and Windows:
+
+### Device detection issues
+
+<Warning>
+  On some distributions, udev rules may cause `usbmuxd` to stop running after devices are disconnected. This prevents Impactor from detecting the device when you plug it back in.
+</Warning>
+
+**Workaround**: Plug in your iOS device first, then start or restart Impactor.
+
+### Auto-refresh behavior
+
+<Info>
+  Auto-refresh does not work the same as on macOS/Windows due to `usbmuxd` lacking WiFi connectivity support. Impactor will attempt automatic refresh only when a device is plugged in via USB.
+</Info>
+
+The development team is actively looking for a proper solution to this limitation.
+
+### Distribution-specific issues
+
+Some distributions (like Bazzite) may require additional steps:
+
+```bash
+# Update crypto policies if device is not detected
+sudo update-crypto-policies
+```
+
+After running this command, restart Impactor and reconnect your device.
+
+## Build requirements
+
+To build Impactor from source on Linux, you need:
+
+- [Rust](https://rustup.rs/) toolchain
+- [CMake](https://cmake.org/download/) and a C++ compiler
+- Development libraries for GTK and system integration
+
+### Ubuntu/Debian
+
+```bash
+sudo apt-get install libclang-dev pkg-config libgtk-3-dev libpng-dev \
+  libjpeg-dev libgl1-mesa-dev libglu1-mesa-dev libxkbcommon-dev \
+  libexpat1-dev libtiff-dev
+```
+
+### Fedora/RHEL
+
+```bash
+sudo dnf install clang-devel pkg-config gtk3-devel libpng-devel \
+  libjpeg-devel mesa-libGL-devel mesa-libGLU-devel libxkbcommon-devel \
+  expat-devel libtiff-devel
+```
+
+### Building from source
+
+```bash
+# Clone the repository
+git clone https://github.com/khcrysalis/PlumeImpactor.git
+cd PlumeImpactor
+
+# Build the GUI application
+cargo run --bin plumeimpactor
+
+# Build the CLI tool
+cargo run --bin plumesign -- <args>
+
+# Create a release build
+make linux PROFILE=release
+
+# Build AppImage (optional)
+make linux PROFILE=release APPIMAGE=1
+```
+
+Built binaries will be available in the `dist/` directory.
+
+## Features
+
+Impactor on Linux includes all core features:
+
+- Sign and sideload iOS apps to connected devices
+- System tray integration with AppIndicator support
+- Auto-refresh when device is connected via USB
+- Support for light and dark themes
+- Native file dialogs and desktop integration
+
+## Troubleshooting
+
+### Device not detected
+
+If your iOS device is not being detected:
+
+<Steps>
+  <Step title="Check usbmuxd status">
+    Verify that usbmuxd is running:
+    
+    ```bash
+    systemctl status usbmuxd
+    ```
+    
+    If it's not running, start it:
+    ```bash
+    sudo systemctl start usbmuxd
+    ```
+  </Step>
+  
+  <Step title="Plug device first, then launch">
+    Due to udev rule issues on some distributions:
+    
+    1. Connect your iOS device via USB
+    2. Unlock the device and tap **Trust** when prompted
+    3. Launch Impactor
+  </Step>
+  
+  <Step title="Check device permissions">
+    Ensure your user has permission to access USB devices:
+    
+    ```bash
+    # Add your user to the plugdev group (Ubuntu/Debian)
+    sudo usermod -aG plugdev $USER
+    
+    # Log out and back in for changes to take effect
+    ```
+  </Step>
+  
+  <Step title="Try crypto policy update">
+    On some distributions like Bazzite:
+    
+    ```bash
+    sudo update-crypto-policies
+    ```
+    
+    Then restart Impactor and reconnect your device.
+  </Step>
+</Steps>
+
+### AppImage tray icon not showing
+
+The AppImage includes system tray libraries, but some desktop environments may require additional packages:
+
+```bash
+# For GNOME Shell
+sudo apt install gnome-shell-extension-appindicator
+
+# For KDE Plasma
+# Tray icons should work out of the box
+```
+
+### Flatpak device access
+
+If using the Flatpak version and devices aren't detected:
+
+```bash
+# Grant device access permission
+flatpak override --user --device=all dev.khcrysalis.PlumeImpactor
+```
+
+### Graphics rendering issues
+
+Impactor automatically falls back to software rendering if Vulkan is not available:
+
+<Info>
+  If you experience crashes on startup, Impactor will automatically use the `tiny-skia` software renderer instead of GPU acceleration.
+</Info>

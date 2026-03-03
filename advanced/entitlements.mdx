@@ -1,0 +1,387 @@
+---
+title: Entitlement handling
+description: Understand how Impactor handles entitlements for app signing and capabilities
+---
+
+Impactor provides advanced entitlement handling to ensure apps are properly signed with the correct capabilities and permissions. This includes automatic entitlement extraction, merging, and registration with Apple's Developer API.
+
+## What are entitlements?
+
+Entitlements are key-value pairs embedded in app binaries that grant specific capabilities:
+
+- App Groups
+- Keychain access
+- Push notifications
+- iCloud services
+- Game Center
+- Increased memory limits
+- App Sandbox permissions
+
+## Entitlement extraction
+
+Impactor extracts entitlements from multiple sources:
+
+<Steps>
+  <Step title="Binary entitlements">
+    Entitlements are read directly from the Mach-O executable:
+    
+    ```rust
+    // From plume_utils/src/signer.rs:264
+    let macho = plume_core::MachO::new(&bundle_executable_path)?;
+    if let Some(e) = macho.entitlements().as_ref() {
+        session.v1_request_capabilities_for_entitlements(&team_id, &id, e).await?;
+    }
+    ```
+  </Step>
+
+  <Step title="Provisioning profile entitlements">
+    Entitlements from the provisioning profile are extracted and merged:
+    
+    ```rust
+    // From plume_core/src/utils/provision.rs:88
+    fn extract_entitlements_from_prov(data: &[u8]) -> Result<(Dictionary, Date), Error> {
+        let plist = plist::Value::from_reader_xml(plist_data)?;
+        let entitlements = plist
+            .as_dictionary()
+            .and_then(|d| d.get("Entitlements"))
+            .and_then(|v| v.as_dictionary())
+            .cloned()
+    }
+    ```
+  </Step>
+
+  <Step title="Entitlement merging">
+    Binary and provisioning entitlements are intelligently merged:
+    
+    ```rust
+    // From plume_core/src/utils/provision.rs:35
+    pub fn merge_entitlements(
+        &mut self,
+        binary_path: PathBuf,
+        new_application_id: &str,
+    ) -> Result<(), Error> {
+        let macho = MachO::new(&binary_path)?;
+        let binary_entitlements = macho.entitlements().clone()?;
+        
+        crate::utils::merge_entitlements(
+            &mut self.entitlements,
+            &binary_entitlements,
+            &new_team_id,
+            &Some(new_application_id.to_string()),
+        );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Wildcard replacement
+
+Impactor automatically replaces wildcard entitlements with actual app identifiers:
+
+```rust
+// From plume_core/src/utils/mod.rs:24
+fn replace_wildcard(value: &mut Value, new_app_id: &str) {
+    match value {
+        Value::String(s) => {
+            if s.contains('*') {
+                *s = s.replace('*', new_app_id);
+            }
+        }
+        Value::Array(arr) => {
+            for item in arr.iter_mut() {
+                replace_wildcard(item, new_app_id);
+            }
+        }
+        Value::Dictionary(dict) => {
+            for v in dict.values_mut() {
+                replace_wildcard(v, new_app_id);
+            }
+        }
+        _ => {}
+    }
+}
+```
+
+This ensures entitlements like `TEAM_ID.*` are properly resolved to `TEAM_ID.com.example.app`.
+
+## Keychain access groups
+
+Keychain entitlements require special handling:
+
+### Team ID validation
+
+```rust
+// From plume_core/src/utils/mod.rs:56
+if let Some(Value::Array(groups)) = additions.get("keychain-access-groups") {
+    base.insert(
+        "keychain-access-groups".to_string(),
+        Value::Array(groups.clone()),
+    );
+}
+
+// Remove invalid entries (must match XXXXXXXXXX.* format)
+if let Some(Value::Array(groups)) = base.get_mut("keychain-access-groups") {
+    let re = regex::Regex::new(TEAM_ID_REGEX).unwrap();
+    groups.retain(|g| matches!(g, Value::String(s) if re.is_match(s)));
+}
+```
+
+### Team ID replacement
+
+```rust
+// From plume_core/src/utils/mod.rs:64
+if let Some(new_id) = new_team_id {
+    if let Some(Value::Array(groups)) = base.get_mut("keychain-access-groups") {
+        for group in groups.iter_mut() {
+            if let Value::String(s) = group {
+                let re = regex::Regex::new(TEAM_ID_REGEX).unwrap();
+                if re.is_match(s) {
+                    *s = format!("{}.{}", new_id, &s[11..]);
+                }
+            }
+        }
+    }
+}
+```
+
+This ensures keychain groups match your team ID.
+
+## App Groups
+
+Impactor automatically registers and assigns App Groups:
+
+```rust
+// From plume_utils/src/signer.rs:285
+if let Some(app_groups) = macho.app_groups_for_entitlements() {
+    let mut app_group_ids: Vec<String> = Vec::new();
+    for group in &app_groups {
+        let mut group_name = format!("{group}.{team_id}");
+        
+        let group_id = session
+            .qh_ensure_app_group(&team_id, &group_name, &group_name)
+            .await?;
+        app_group_ids.push(group_id.application_group);
+    }
+    
+    session
+        .qh_assign_app_group(&team_id, &app_id_id.app_id_id, &app_group_ids)
+        .await?;
+}
+```
+
+<Note>
+  App Groups are automatically appended with your team ID (e.g., `group.com.example` becomes `group.com.example.TEAM123456`).
+</Note>
+
+## Capability registration
+
+Impactor requests capabilities from Apple's Developer API:
+
+```rust
+// From plume_utils/src/signer.rs:279
+if let Some(e) = macho.entitlements().as_ref() {
+    session
+        .v1_request_capabilities_for_entitlements(&team_id, &id, e)
+        .await?;
+}
+```
+
+This ensures capabilities like push notifications, iCloud, and Game Center are properly enabled.
+
+## Advanced entitlements
+
+### Increased memory limit
+
+For emulators like PPSSPP, Delta, or UTM:
+
+```xml
+<key>com.apple.developer.kernel.increased-memory-limit</key>
+<true/>
+```
+
+Impactor preserves this entitlement during signing, allowing apps to use more than the default memory limit.
+
+### App Sandbox
+
+MacOS apps on Apple Silicon require specific entitlements:
+
+```xml
+<key>com.apple.security.app-sandbox</key>
+<true/>
+<key>com.apple.security.application-groups</key>
+<array>
+    <string>group.com.example.app.TEAM123456</string>
+</array>
+```
+
+### Plugin entitlements
+
+App extensions (`.appex`) receive separate entitlements:
+
+```rust
+// From plume_utils/src/signer.rs:229
+let bundles = bundle
+    .collect_bundles_sorted()?
+    .into_iter()
+    .filter(|b| b.bundle_type().should_have_entitlements())
+    .collect::<Vec<_>>();
+```
+
+Each plugin is registered and signed with appropriate entitlements.
+
+## Single profile mode
+
+For apps like LiveContainer that require unified entitlements:
+
+```rust
+// From plume_utils/src/options.rs:59
+match app {
+    SignerApp::LiveContainer | SignerApp::LiveContainerAndSideStore => {
+        settings.embedding.single_profile = true;
+    }
+    _ => {}
+}
+```
+
+In single profile mode:
+- One provisioning profile is used for all bundles
+- Entitlements are consistent across the app and extensions
+- Custom entitlement files can be provided
+
+## Bundle type handling
+
+Different bundle types receive different entitlement treatment:
+
+```rust
+// From plume_utils/src/signer.rs:383
+if *bundle.bundle_type() == BundleType::Unknown {
+    return Ok(());
+}
+
+if bundle.bundle_type().should_have_entitlements() {
+    // Apply provisioning profile and entitlements
+}
+```
+
+- **Apps** - Full entitlements from provisioning profile
+- **App Extensions** - Extension-specific entitlements
+- **Frameworks** - Signed without entitlements
+- **Dylibs** - Signed without entitlements
+
+## Custom entitlements
+
+You can provide custom entitlement files:
+
+```rust
+// From plume_utils/src/signer.rs:432
+if self.options.embedding.single_profile {
+    if let Some(ent_path) = &self.options.custom_entitlements {
+        let ent_bytes = std::fs::read(ent_path)?;
+        entitlements_xml = String::from_utf8_lossy(&ent_bytes).to_string();
+    }
+}
+```
+
+Useful for:
+- Testing specific capabilities
+- Overriding automatic entitlement detection
+- Debugging signing issues
+
+## Adhoc signing
+
+Adhoc signed apps use minimal entitlements:
+
+```rust
+// From plume_utils/src/signer.rs:349
+let entitlements_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict/>
+</plist>
+"#.to_string();
+```
+
+Adhoc signing:
+- Does not require provisioning profiles
+- Has no entitlements by default
+- Works only on jailbroken devices or with AppSync
+
+## Entitlement debugging
+
+To inspect entitlements in a signed app:
+
+```bash
+# Extract entitlements from binary
+codesign -d --entitlements - /path/to/app.app
+
+# View provisioning profile entitlements
+security cms -D -i /path/to/app.app/embedded.mobileprovision
+```
+
+## Common entitlements
+
+| Entitlement | Purpose | Example |
+|-------------|---------|--------|
+| `application-identifier` | App's unique identifier | `TEAM123456.com.example.app` |
+| `com.apple.developer.team-identifier` | Developer team ID | `TEAM123456` |
+| `keychain-access-groups` | Keychain sharing | `["TEAM123456.*"]` |
+| `com.apple.security.application-groups` | App Group sharing | `["group.com.example.app"]` |
+| `aps-environment` | Push notifications | `development` or `production` |
+| `com.apple.developer.kernel.increased-memory-limit` | Increased RAM | `true` |
+| `get-task-allow` | Debugging | `true` |
+
+## Best practices
+
+1. **Let Impactor handle entitlements** - Automatic extraction is usually sufficient
+2. **Use custom entitlements sparingly** - Only when needed for specific use cases
+3. **Verify capabilities** - Check Apple Developer portal for registered capabilities
+4. **Test thoroughly** - Some entitlements require specific device configurations
+5. **Understand limitations** - Free accounts have restricted entitlement access
+
+## Limitations
+
+### Free Apple Developer accounts
+
+- Cannot use push notifications (`aps-environment`)
+- Limited App Group access
+- No CloudKit containers
+- No Wallet/PassKit
+- No SiriKit
+
+### Provisioning profile constraints
+
+- Entitlements must match those registered on Apple's portal
+- Wildcard profiles have limited entitlements
+- Explicit App IDs support more capabilities
+
+## Troubleshooting
+
+### "Entitlements not found" error
+
+The binary may not have embedded entitlements:
+- Use custom entitlement file
+- Verify the app was properly signed originally
+- Check for adhoc signing requirements
+
+### "Invalid entitlement" during signing
+
+- Entitlement not supported by your developer account
+- Capability not enabled on Apple Developer portal
+- Team ID mismatch in entitlements
+
+### App crashes on launch with entitlement issues
+
+- Verify entitlements in provisioning profile match binary
+- Check that all App Groups are properly registered
+- Ensure keychain-access-groups have correct team ID
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Tweak Injection" icon="syringe" href="/advanced/tweaks">
+    Inject tweaks with ElleKit
+  </Card>
+  <Card title="AppSync" icon="arrow-down-to-line" href="/advanced/appsync">
+    Install apps with AppSync
+  </Card>
+</CardGroup>

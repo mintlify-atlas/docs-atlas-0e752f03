@@ -1,0 +1,339 @@
+---
+title: "GUI settings"
+description: "Configure Apple accounts, signing preferences, and application settings"
+---
+
+The settings screen lets you manage Apple accounts, configure auto-start behavior, and control signing options. Access settings by clicking the gear icon in the top-right corner of the main window.
+
+## Apple account management
+
+Manage the Apple accounts used for signing applications.
+
+### Add an account
+
+<Steps>
+
+<Step title="Click Add Account">
+  Press the **Add Account** button at the bottom of the settings screen.
+</Step>
+
+<Step title="Enter credentials">
+  A login window appears:
+  - Enter your Apple ID email
+  - Enter your password
+  - Click **Login**
+</Step>
+
+<Step title="Handle two-factor authentication (if required)">
+  If your account has 2FA enabled:
+  1. Enter the 6-digit verification code sent to your trusted devices
+  2. Click **Verify**
+  3. Wait for authentication to complete
+</Step>
+
+<Step title="Account appears in list">
+  Your account is now added and appears in the account list with a checkbox.
+</Step>
+
+</Steps>
+
+<Info>
+Impactor stores account credentials securely in `accounts.json` within the application data directory. Certificates are cached locally for signing operations.
+</Info>
+
+### Select an account
+
+The currently selected account is used for all signing operations:
+
+1. Find the account in the list (marked with **[✓]** when selected)
+2. Click the account button to select it
+3. The selected account is highlighted and shows as active
+
+<Note>
+You can have multiple accounts configured, but only one can be active at a time. The selected account's certificate is used for app signing.
+</Note>
+
+### Switch teams
+
+If your Apple account belongs to multiple development teams:
+
+<Steps>
+
+<Step title="Select the account">
+  Click on the account to make it active.
+</Step>
+
+<Step title="Open team dropdown">
+  A team picker appears next to the selected account showing either:
+  - Current team ID
+  - "Select team..." placeholder
+  - "Loading teams..." while fetching
+</Step>
+
+<Step title="Choose a team">
+  Click the dropdown to load teams from your account, then select the desired team.
+  
+  Teams display as: **Team Name (Team ID)**
+</Step>
+
+<Step title="Team is saved">
+  The selection is saved automatically and used for future signing operations.
+</Step>
+
+</Steps>
+
+<Tip>
+Teams are fetched on-demand when you open the dropdown. If you see "Loading teams...", wait a moment for the list to populate.
+</Tip>
+
+### Remove an account
+
+<Steps>
+
+<Step title="Select the account">
+  Click on the account you want to remove to make it active.
+</Step>
+
+<Step title="Click Remove Account">
+  Press the **Remove Account** button that appears when an account is selected.
+</Step>
+
+<Step title="Confirm removal">
+  The account is immediately removed from the list and deleted from storage.
+</Step>
+
+</Steps>
+
+<Warning>
+Removing an account deletes its stored credentials and certificates. You'll need to log in again to add it back.
+</Warning>
+
+### Export certificate (P12)
+
+Export your account's signing certificate as a P12 file:
+
+<Steps>
+
+<Step title="Select an account">
+  Click on the account you want to export from.
+</Step>
+
+<Step title="Click Export P12">
+  Press the **Export P12** button available when an account is selected.
+</Step>
+
+<Step title="Choose save location">
+  A file dialog appears allowing you to specify where to save the P12 file.
+</Step>
+
+<Step title="Certificate is exported">
+  The P12 file contains your private key and certificate, suitable for use with other signing tools.
+</Step>
+
+</Steps>
+
+<Note>
+The exported P12 file contains sensitive cryptographic material. Store it securely and do not share it.
+</Note>
+
+## Auto-start configuration
+
+Control whether Impactor launches automatically when you log in to your computer.
+
+### Enable auto-start
+
+1. Find the **Launch on Startup** checkbox in the settings screen
+2. Check the box to enable auto-start
+3. The setting is saved immediately
+
+### Platform-specific behavior
+
+**macOS:**
+- Registers with Launch Services
+- Starts when you log in
+- Can start in system tray depending on configuration
+
+**Linux:**
+- Creates an autostart desktop entry
+- Follows XDG autostart specification
+- Respects system session settings
+
+**Windows:**
+- Adds a registry entry under `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`
+- Launches on user login
+
+<Tip>
+Enable auto-start if you want the auto-refresh feature to work continuously in the background.
+</Tip>
+
+## Account list display
+
+The account list shows all configured accounts with:
+
+**For all accounts:**
+- Email address
+- Clickable button to select
+
+**For selected account (in addition):**
+- **[✓]** marker indicating active selection
+- Highlighted appearance (primary button style)
+- Team selector dropdown
+- Management buttons (Remove Account, Export P12)
+
+**Empty state:**
+- Displays "No accounts added yet" when no accounts are configured
+- Only the **Add Account** button is available
+
+## Settings screen navigation
+
+### Accessing settings
+
+Click the **gear icon** (⚙️) in the top-right corner from:
+- Main screen
+- Utilities screen
+- Installer screen (preserves installer state)
+
+### Returning from settings
+
+Click the **back arrow** (←) to return to the previous screen:
+- Returns to where you came from
+- Preserves navigation history
+- Auto-refreshes utilities if returning there
+
+<Info>
+The settings screen remembers which screen you came from and returns you there when you click back.
+</Info>
+
+## Account storage and synchronization
+
+Accounts are stored in `accounts.json` in the application data directory:
+
+**Location by platform:**
+- **macOS**: `~/Library/Application Support/Impactor/accounts.json`
+- **Linux**: `~/.local/share/Impactor/accounts.json`
+- **Windows**: `%APPDATA%\Impactor\accounts.json`
+
+**What's stored:**
+- Apple ID email
+- Authentication tokens
+- Signing certificates
+- Selected team IDs
+- Refresh device associations
+
+**Synchronization:**
+- Changes save immediately to disk
+- Account store reloads after login window closes
+- Settings screen refreshes on account changes
+
+<Warning>
+The `accounts.json` file contains sensitive authentication data. Do not share or commit it to version control.
+</Warning>
+
+## Login window
+
+The login window appears when:
+- You click **Add Account**
+- Installation requires authentication (Pem mode without logged-in account)
+
+### Login flow
+
+1. **Email and password entry**
+   - Enter Apple ID credentials
+   - Click **Login** or press Enter
+
+2. **Two-factor authentication (if enabled)**
+   - Automatically transitions to 2FA screen
+   - Enter 6-digit code from trusted device
+   - Click **Verify**
+
+3. **Completion**
+   - Window closes on success
+   - Account appears in settings
+   - Pending installation proceeds (if triggered from installer)
+
+### Login cancellation
+
+- Click **Cancel** to abort login
+- Window closes without saving
+- Pending installation is cancelled
+- Returns to previous screen
+
+<Note>
+If login is triggered during installation, the installation will only proceed after successful authentication.
+</Note>
+
+## Troubleshooting
+
+### Login fails with incorrect password
+
+**Solutions:**
+1. Verify your Apple ID and password
+2. Try logging in to appleid.apple.com to confirm credentials
+3. Reset your password if needed
+4. Try again in Impactor
+
+### Two-factor code not received
+
+**Solutions:**
+1. Wait a few moments for the code to arrive
+2. Request a new code by clicking the login button again
+3. Ensure trusted devices are connected to the internet
+4. Check SMS if using phone number for 2FA
+
+### Export P12 fails
+
+**Possible causes:**
+- Account not fully authenticated
+- Certificate not yet fetched
+- File save location denied
+
+**Solutions:**
+1. Ensure account is selected and authenticated
+2. Try removing and re-adding the account
+3. Choose a different save location with write permissions
+
+### Auto-start not working
+
+**Platform-specific checks:**
+
+**macOS:**
+- Check System Preferences → Users & Groups → Login Items
+- Verify Impactor appears in the list
+
+**Linux:**
+- Check `~/.config/autostart/` for the desktop entry
+- Verify file permissions are correct
+
+**Windows:**
+- Open `regedit` and check `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`
+- Verify Impactor entry exists
+
+### Account list not updating
+
+1. Close and reopen the settings screen
+2. Restart the application
+3. Check `accounts.json` exists in the data directory
+4. Remove corrupted `accounts.json` and re-add accounts
+
+### Team list empty or won't load
+
+**Solutions:**
+1. Ensure account is authenticated
+2. Check internet connection
+3. Wait for loading to complete (can take several seconds)
+4. Try removing and re-adding the account
+5. Verify account has access to development teams
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Install apps" icon="download" href="/gui/sideloading-apps">
+  Use your configured account to sign and install apps.
+</Card>
+
+<Card title="Device utilities" icon="wrench" href="/gui/device-utilities">
+  Set up device pairing and view installed apps.
+</Card>
+
+</CardGroup>

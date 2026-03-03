@@ -1,0 +1,60 @@
+---
+title: Welcome to Impactor
+description: Open-source, cross-platform iOS sideloading application for macOS, Linux, and Windows
+---
+
+<img src="https://github.com/user-attachments/assets/18f2eff4-546f-4365-98eb-afb19b13dc13" width="50" height="50" />
+
+# Welcome to Impactor
+
+Impactor is an open-source, cross-platform, and feature-rich iOS sideloading application. Sign and install iOS apps on your devices using your Apple ID—no jailbreak required.
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Get Impactor installed on macOS, Linux, or Windows
+  </Card>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Sideload your first app in minutes
+  </Card>
+  <Card title="How it works" icon="gear" href="/concepts/how-it-works">
+    Learn about the sideloading process
+  </Card>
+  <Card title="Advanced features" icon="sparkles" href="/advanced/tweaks">
+    Explore advanced features and capabilities
+  </Card>
+</CardGroup>
+
+## Key features
+
+- **User friendly and clean UI** - Modern interface built with Iced
+- **Cross-platform support** - Works on macOS, Linux, and Windows
+- **Sign with Apple ID** - Install apps on iOS 9.0+ using your Apple Account
+- **Advanced tweak support** - Inject tweaks using ElleKit for advanced users
+- **Pairing file generation** - Create pairing files for SideStore, Antrag, and other apps
+- **Proper entitlement handling** - Request entitlements like `increased-memory-limit` for emulators
+
+<Info>
+  Impactor replicates what Xcode does by using your Apple Account to request certificates, provisioning profiles, and register your device from Apple servers.
+</Info>
+
+## Platform-specific notes
+
+<Tabs>
+  <Tab title="macOS">
+    Works out of the box on macOS. No additional setup required.
+  </Tab>
+  <Tab title="Linux">
+    Requires `usbmuxd` installed on your system. It comes with most popular distributions by default.
+    
+    <Note>
+      Some distributions may need you to plug your device in first, then restart Impactor to detect the device.
+    </Note>
+  </Tab>
+  <Tab title="Windows">
+    Requires [iTunes](https://support.apple.com/en-us/106372) to be installed so Impactor can use the Apple device drivers.
+  </Tab>
+</Tabs>
+
+## Getting started
+
+Ready to start sideloading? Follow our [installation guide](/installation) to get Impactor on your system, then check out the [quick start guide](/quickstart) to sideload your first app.

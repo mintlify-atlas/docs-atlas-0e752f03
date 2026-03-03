@@ -1,0 +1,228 @@
+---
+title: plumesign macho
+description: Inspect and modify Mach-O binary files
+---
+
+The `macho` command provides tools for inspecting and modifying Mach-O executable files, including viewing entitlements, managing dynamic library dependencies, and modifying SDK versions.
+
+## Usage
+
+```bash
+plumesign macho <BINARY> [OPTIONS]
+```
+
+<ParamField path="BINARY" type="path" required>
+  Path to the Mach-O binary file to inspect or modify.
+  
+  ```bash
+  plumesign macho MyApp
+  ```
+</ParamField>
+
+## Inspection
+
+### Entitlements
+
+<ParamField path="--entitlements" type="boolean">
+  Display the entitlements embedded in the binary as XML.
+  
+  ```bash
+  plumesign macho MyApp --entitlements
+  ```
+</ParamField>
+
+#### Example output
+
+```bash
+$ plumesign macho MyApp --entitlements
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>application-identifier</key>
+    <string>TEAM123.com.company.app</string>
+    <key>com.apple.developer.team-identifier</key>
+    <string>TEAM123</string>
+    <key>get-task-allow</key>
+    <true/>
+    <key>keychain-access-groups</key>
+    <array>
+        <string>TEAM123.*</string>
+    </array>
+</dict>
+</plist>
+```
+
+### List dynamic libraries
+
+<ParamField path="--list-dylibs" type="boolean">
+  List all dynamic library (dylib) dependencies of the binary.
+  
+  ```bash
+  plumesign macho MyApp --list-dylibs
+  ```
+</ParamField>
+
+#### Example output
+
+```bash
+$ plumesign macho MyApp --list-dylibs
+@rpath/MyFramework.framework/MyFramework
+/usr/lib/libobjc.A.dylib
+/usr/lib/libSystem.B.dylib
+/System/Library/Frameworks/Foundation.framework/Foundation
+/System/Library/Frameworks/UIKit.framework/UIKit
+@rpath/CustomLib.dylib
+```
+
+## Modification
+
+<Warning>
+All modification operations write changes directly to the binary file. Make a backup before modifying production binaries.
+</Warning>
+
+### Add dynamic library
+
+<ParamField path="--add-dylib" type="string">
+  Add a new dynamic library dependency to the binary.
+  
+  Common path prefixes:
+  - `@rpath/` - Relative to runtime search paths
+  - `@executable_path/` - Relative to executable location
+  - `@loader_path/` - Relative to loading binary
+  
+  ```bash
+  plumesign macho MyApp --add-dylib "@rpath/MyTweak.dylib"
+  ```
+</ParamField>
+
+### Replace dynamic library
+
+<ParamField path="--replace-dylib" type="string[]">
+  Replace an existing dynamic library reference with a new one. Requires exactly two arguments: the old path and the new path.
+  
+  ```bash
+  plumesign macho MyApp --replace-dylib "@rpath/OldLib.dylib" "@rpath/NewLib.dylib"
+  ```
+</ParamField>
+
+### Set SDK version
+
+<ParamField path="--sdk-version" type="string">
+  Set the minimum SDK version required by the binary.
+  
+  Version format: `MAJOR.MINOR.PATCH` (e.g., `16.0.0`, `17.2.0`)
+  
+  ```bash
+  plumesign macho MyApp --sdk-version "16.0.0"
+  ```
+</ParamField>
+
+## Examples
+
+### View binary entitlements
+
+```bash
+plumesign macho /Applications/MyApp.app/MyApp --entitlements
+```
+
+### List all dependencies
+
+```bash
+plumesign macho MyApp --list-dylibs
+```
+
+### Inject a tweak library
+
+```bash
+plumesign macho MyApp --add-dylib "@executable_path/Tweaks/MyTweak.dylib"
+```
+
+### Update library path
+
+```bash
+plumesign macho MyApp \
+  --replace-dylib \
+  "@rpath/OldFramework.framework/OldFramework" \
+  "@rpath/NewFramework.framework/NewFramework"
+```
+
+### Lower SDK version requirement
+
+```bash
+plumesign macho MyApp --sdk-version "15.0.0"
+```
+
+## Use cases
+
+### Tweak injection
+
+Add custom dylib tweaks to an app binary:
+
+```bash
+# First, add the dylib dependency
+plumesign macho MyApp.app/MyApp --add-dylib "@executable_path/Frameworks/Tweak.dylib"
+
+# Then copy the tweak to the app bundle
+cp Tweak.dylib MyApp.app/Frameworks/
+
+# Finally, resign the app
+plumesign sign --package MyApp.app --apple-id
+```
+
+### Framework path updates
+
+Update framework paths when relocating frameworks:
+
+```bash
+plumesign macho MyApp --replace-dylib \
+  "@rpath/MyFramework.framework/MyFramework" \
+  "@executable_path/Frameworks/MyFramework.framework/MyFramework"
+```
+
+### Compatibility patching
+
+Lower the minimum iOS version requirement:
+
+```bash
+# Set SDK to iOS 14.0
+plumesign macho MyApp --sdk-version "14.0.0"
+```
+
+### Debugging entitlements
+
+Verify entitlements after signing:
+
+```bash
+plumesign sign --package MyApp.app --apple-id
+plumesign macho MyApp.app/MyApp --entitlements
+```
+
+## Technical details
+
+### Mach-O format
+
+Mach-O (Mach Object) is the executable file format used by macOS and iOS. It contains:
+
+- **Header**: Architecture and file type information
+- **Load commands**: Instructions for the dynamic linker
+- **Segments**: Code, data, and other binary content
+- **Code signature**: Cryptographic signature and entitlements
+
+### Fat binaries
+
+Many iOS binaries are "fat" or "universal" binaries containing multiple architectures (arm64, arm64e). The `macho` command currently operates on the first architecture in the binary.
+
+<Note>
+Future versions may support selecting specific architectures via an `--arch` flag.
+</Note>
+
+### Dylib paths
+
+iOS and macOS support several special path prefixes for dynamic library loading:
+
+- `@rpath/` - Searches runtime search paths (LC_RPATH load commands)
+- `@executable_path/` - Relative to the main executable
+- `@loader_path/` - Relative to the binary that loads this dylib
+
+These allow flexible library packaging and relocation.

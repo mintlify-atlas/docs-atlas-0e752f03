@@ -1,0 +1,81 @@
+---
+title: CLI reference
+description: Command-line interface for signing and managing iOS applications
+---
+
+plumesign is a powerful command-line tool for iOS code signing, certificate management, and app inspection. It provides a complete workflow for signing iOS applications, managing Apple Developer accounts, and working with Mach-O binaries.
+
+## Installation
+
+The plumesign CLI is included with Impactor. Once installed, you can run it from your terminal:
+
+```bash
+plumesign --help
+```
+
+## Available commands
+
+plumesign provides four main commands:
+
+### sign
+
+Sign iOS app bundles (.app) or packages (.ipa) with certificates and provisioning profiles.
+
+```bash
+plumesign sign --package MyApp.ipa --apple-id
+```
+
+[Learn more about the sign command →](/cli/sign)
+
+### account
+
+Manage Apple Developer account authentication, list certificates, devices, and app IDs.
+
+```bash
+plumesign account login --username user@example.com
+```
+
+[Learn more about the account command →](/cli/account)
+
+### device
+
+Install apps to connected iOS devices and manage device pairing.
+
+```bash
+plumesign device --install MyApp.ipa
+```
+
+[Learn more about the device command →](/cli/device)
+
+### macho
+
+Inspect and modify Mach-O binaries, including entitlements and dynamic library dependencies.
+
+```bash
+plumesign macho MyApp --entitlements
+```
+
+[Learn more about the macho command →](/cli/macho)
+
+## Global behavior
+
+All plumesign commands use debug-level logging by default. Command output includes detailed progress information and any errors encountered during execution.
+
+### Configuration directory
+
+plumesign stores account credentials and certificates in:
+
+- **macOS/Linux**: `~/.config/PlumeImpactor/`
+- **Windows**: `%APPDATA%\PlumeImpactor\`
+
+This directory is automatically created when you first run plumesign.
+
+## Getting help
+
+For help with any command, use the `--help` flag:
+
+```bash
+plumesign --help
+plumesign sign --help
+plumesign account --help
+```

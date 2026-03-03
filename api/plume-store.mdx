@@ -1,0 +1,468 @@
+---
+title: Account storage API
+description: Persist and manage Apple ID credentials with plume_store
+---
+
+The `plume_store` crate provides utilities for persisting Apple ID authentication credentials and managing multiple accounts.
+
+## Overview
+
+This crate contains:
+
+- **GsaAccount** - Serializable representation of an authenticated Apple account
+- **AccountStore** - Persistent storage for multiple accounts
+- **RefreshDevice** - Device-specific refresh configuration
+- **RefreshApp** - App-specific refresh settings
+
+## Exports
+
+```rust
+pub use gsa_account::{GsaAccount, account_from_session};
+pub use refresh::{RefreshApp, RefreshDevice};
+pub use store::AccountStore;
+```
+
+## GsaAccount
+
+```rust
+pub struct GsaAccount {
+    email: String,
+    first_name: String,
+    adsid: String,
+    xcode_gs_token: String,
+    team_id: String,
+}
+```
+
+Represents stored authentication credentials that can be reused without re-authenticating.
+
+### Creating an account
+
+<ParamField path="new" type="fn">
+  ```rust
+  pub fn new(
+      email: String,
+      first_name: String,
+      adsid: String,
+      xcode_gs_token: String,
+      team_id: String,
+  ) -> Self
+  ```
+  
+  Creates a new GsaAccount with the provided credentials
+</ParamField>
+
+<ParamField path="account_from_session" type="async fn">
+  ```rust
+  pub async fn account_from_session(
+      email: String,
+      account: plume_core::auth::Account,
+  ) -> Result<GsaAccount, plume_core::Error>
+  ```
+  
+  Creates a GsaAccount from an authenticated Account instance. Automatically fetches team information.
+</ParamField>
+
+<CodeGroup>
+```rust From authenticated session
+use plume_core::auth::Account;
+use plume_store::account_from_session;
+
+let account = Account::login(
+    || Ok(("user@icloud.com".to_string(), "password".to_string())),
+    || Ok("123456".to_string()),
+    config
+).await?;
+
+let gsa_account = account_from_session(
+    "user@icloud.com".to_string(),
+    account
+).await?;
+
+println!("Stored account for: {}", gsa_account.email());
+```
+</CodeGroup>
+
+### Accessors
+
+<ParamField path="email" type="fn">
+  ```rust
+  pub fn email(&self) -> &String
+  ```
+  
+  Returns the Apple ID email address
+</ParamField>
+
+<ParamField path="first_name" type="fn">
+  ```rust
+  pub fn first_name(&self) -> &String
+  ```
+  
+  Returns the account holder's first name
+</ParamField>
+
+<ParamField path="adsid" type="fn">
+  ```rust
+  pub fn adsid(&self) -> &String
+  ```
+  
+  Returns the Apple Directory Services ID
+</ParamField>
+
+<ParamField path="xcode_gs_token" type="fn">
+  ```rust
+  pub fn xcode_gs_token(&self) -> &String
+  ```
+  
+  Returns the Xcode GrandSlam authentication token
+</ParamField>
+
+<ParamField path="team_id" type="fn">
+  ```rust
+  pub fn team_id(&self) -> &String
+  ```
+  
+  Returns the selected Apple Developer team ID
+</ParamField>
+
+<ParamField path="set_team_id" type="fn">
+  ```rust
+  pub fn set_team_id(&mut self, team_id: String)
+  ```
+  
+  Updates the team ID
+</ParamField>
+
+## AccountStore
+
+```rust
+pub struct AccountStore {
+    selected_account: Option<String>,
+    accounts: HashMap<String, GsaAccount>,
+    refreshes: HashMap<String, RefreshDevice>,
+    path: Option<PathBuf>,
+}
+```
+
+Persistent storage for multiple Apple ID accounts and device refresh configurations.
+
+### Loading and saving
+
+<ParamField path="load" type="async fn">
+  ```rust
+  pub async fn load(path: &Option<PathBuf>) -> Result<Self, Error>
+  ```
+  
+  Loads account store from a JSON file. Creates a new empty store if the file doesn't exist.
+</ParamField>
+
+<ParamField path="load_sync" type="fn">
+  ```rust
+  pub fn load_sync(path: &Option<PathBuf>) -> Result<Self, Error>
+  ```
+  
+  Synchronous version of load
+</ParamField>
+
+<ParamField path="save" type="async fn">
+  ```rust
+  pub async fn save(&self) -> Result<(), Error>
+  ```
+  
+  Saves the store to disk as pretty-printed JSON
+</ParamField>
+
+<ParamField path="save_sync" type="fn">
+  ```rust
+  pub fn save_sync(&self) -> Result<(), Error>
+  ```
+  
+  Synchronous version of save
+</ParamField>
+
+<CodeGroup>
+```rust Load and save
+use plume_store::AccountStore;
+use std::path::PathBuf;
+
+let path = Some(PathBuf::from("/path/to/accounts.json"));
+let mut store = AccountStore::load(&path).await?;
+
+// Make changes...
+
+store.save().await?;
+```
+</CodeGroup>
+
+### Managing accounts
+
+<ParamField path="accounts_add" type="async fn">
+  ```rust
+  pub async fn accounts_add(&mut self, account: GsaAccount) -> Result<(), Error>
+  ```
+  
+  Adds an account and sets it as selected
+</ParamField>
+
+<ParamField path="accounts_add_from_session" type="async fn">
+  ```rust
+  pub async fn accounts_add_from_session(
+      &mut self,
+      email: String,
+      account: plume_core::auth::Account,
+  ) -> Result<(), Error>
+  ```
+  
+  Creates a GsaAccount from an authenticated session and adds it to the store
+</ParamField>
+
+<ParamField path="accounts_remove" type="async fn">
+  ```rust
+  pub async fn accounts_remove(&mut self, email: &str) -> Result<(), Error>
+  ```
+  
+  Removes an account by email
+</ParamField>
+
+<ParamField path="account_select" type="async fn">
+  ```rust
+  pub async fn account_select(&mut self, email: &str) -> Result<(), Error>
+  ```
+  
+  Sets the selected account
+</ParamField>
+
+<ParamField path="get_account" type="fn">
+  ```rust
+  pub fn get_account(&self, email: &str) -> Option<&GsaAccount>
+  ```
+  
+  Retrieves an account by email
+</ParamField>
+
+<ParamField path="selected_account" type="fn">
+  ```rust
+  pub fn selected_account(&self) -> Option<&GsaAccount>
+  ```
+  
+  Returns the currently selected account
+</ParamField>
+
+<ParamField path="accounts" type="fn">
+  ```rust
+  pub fn accounts(&self) -> &HashMap<String, GsaAccount>
+  ```
+  
+  Returns all stored accounts
+</ParamField>
+
+<CodeGroup>
+```rust Managing multiple accounts
+use plume_store::AccountStore;
+use std::path::PathBuf;
+
+let path = Some(PathBuf::from("accounts.json"));
+let mut store = AccountStore::load(&path).await?;
+
+// Add account from authenticated session
+store.accounts_add_from_session(
+    "user@icloud.com".to_string(),
+    account
+).await?;
+
+// List all accounts
+for (email, account) in store.accounts() {
+    println!("{} - {} (Team: {})",
+        email,
+        account.first_name(),
+        account.team_id()
+    );
+}
+
+// Switch active account
+store.account_select("other@icloud.com").await?;
+
+// Get selected account
+if let Some(active) = store.selected_account() {
+    println!("Active account: {}", active.email());
+}
+
+// Remove account
+store.accounts_remove("old@icloud.com").await?;
+```
+</CodeGroup>
+
+### Team management
+
+<ParamField path="update_account_team" type="async fn">
+  ```rust
+  pub async fn update_account_team(
+      &mut self,
+      email: &str,
+      team_id: String
+  ) -> Result<(), Error>
+  ```
+  
+  Updates the team ID for an account
+</ParamField>
+
+<CodeGroup>
+```rust Switch teams
+store.update_account_team(
+    "user@icloud.com",
+    "NEWTEAM123".to_string()
+).await?;
+```
+</CodeGroup>
+
+### Refresh configuration
+
+<ParamField path="get_refresh_device" type="fn">
+  ```rust
+  pub fn get_refresh_device(&self, udid: &str) -> Option<&RefreshDevice>
+  ```
+  
+  Gets refresh configuration for a device by UDID
+</ParamField>
+
+<ParamField path="add_or_update_refresh_device" type="async fn">
+  ```rust
+  pub async fn add_or_update_refresh_device(
+      &mut self,
+      device: RefreshDevice,
+  ) -> Result<(), Error>
+  ```
+  
+  Adds or updates refresh configuration for a device
+</ParamField>
+
+<ParamField path="remove_refresh_device" type="async fn">
+  ```rust
+  pub async fn remove_refresh_device(&mut self, udid: &str) -> Result<(), Error>
+  ```
+  
+  Removes refresh configuration for a device
+</ParamField>
+
+<ParamField path="refreshes" type="fn">
+  ```rust
+  pub fn refreshes(&self) -> &HashMap<String, RefreshDevice>
+  ```
+  
+  Returns all device refresh configurations
+</ParamField>
+
+## RefreshDevice
+
+Stores device-specific configuration for automatic app refresh.
+
+```rust
+pub struct RefreshDevice {
+    pub udid: String,
+    // ... other fields
+}
+```
+
+## RefreshApp
+
+Stores app-specific refresh settings.
+
+```rust
+pub struct RefreshApp {
+    // App-specific settings
+}
+```
+
+## Storage format
+
+The AccountStore is serialized to JSON:
+
+```json
+{
+  "selected_account": "user@icloud.com",
+  "accounts": {
+    "user@icloud.com": {
+      "email": "user@icloud.com",
+      "first_name": "John",
+      "adsid": "ABC123...",
+      "xcode_gs_token": "XYZ789...",
+      "team_id": "TEAM123ABC"
+    }
+  },
+  "refreshes": {
+    "00008030-001234567890123A": {
+      "udid": "00008030-001234567890123A"
+    }
+  }
+}
+```
+
+## Complete example
+
+<CodeGroup>
+```rust Full workflow
+use plume_core::auth::Account;
+use plume_core::developer::DeveloperSession;
+use plume_store::AccountStore;
+use omnisette::AnisetteConfiguration;
+use std::path::PathBuf;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let store_path = Some(PathBuf::from("accounts.json"));
+    let mut store = AccountStore::load(&store_path).await?;
+    
+    // Check if we have a stored account
+    if let Some(gsa_account) = store.selected_account() {
+        println!("Using stored account: {}", gsa_account.email());
+        
+        // Create session from stored credentials
+        let session = DeveloperSession::new(
+            gsa_account.adsid().clone(),
+            gsa_account.xcode_gs_token().clone(),
+            AnisetteConfiguration::default()
+        ).await?;
+        
+        println!("Session created successfully");
+    } else {
+        // No stored account, need to authenticate
+        println!("No stored account, logging in...");
+        
+        let account = Account::login(
+            || Ok(("user@icloud.com".to_string(), "password".to_string())),
+            || Ok("123456".to_string()),
+            AnisetteConfiguration::default()
+        ).await?;
+        
+        // Store the authenticated account
+        store.accounts_add_from_session(
+            "user@icloud.com".to_string(),
+            account
+        ).await?;
+        
+        println!("Account stored for future use");
+    }
+    
+    Ok(())
+}
+```
+</CodeGroup>
+
+## Synchronous API
+
+All async methods have synchronous equivalents:
+
+- `accounts_add_sync`
+- `accounts_remove_sync`
+- `account_select_sync`
+- `update_account_team_sync`
+- `add_or_update_refresh_device_sync`
+- `remove_refresh_device_sync`
+
+<CodeGroup>
+```rust Synchronous usage
+let mut store = AccountStore::load_sync(&path)?;
+store.account_select_sync("user@icloud.com")?;
+store.save_sync()?;
+```
+</CodeGroup>

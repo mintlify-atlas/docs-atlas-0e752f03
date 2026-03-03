@@ -1,0 +1,367 @@
+---
+title: Pairing files
+description: Understanding device pairing files and wireless app management
+---
+
+Pairing files enable iOS apps to communicate with your device remotely, allowing wireless app installation, device customization, and system access without needing a USB connection.
+
+## What is a pairing file?
+
+A pairing file (also called a pairing record) is a cryptographic credential that establishes trust between your computer and iOS device. It contains:
+
+- **Device identifier** - Your device's UDID
+- **Host identifier** - Computer that created the pairing
+- **SSL certificates** - For encrypted communication
+- **Escrow keys** - For accessing device services
+- **WiFi MAC address** - For wireless connectivity
+
+<Info>
+  Think of a pairing file as a "key" that unlocks wireless communication with your iOS device. Once an app has this key, it can perform many operations that normally require iTunes or Finder.
+</Info>
+
+## How pairing works
+
+When you first connect your iOS device to a computer:
+
+<Steps>
+  <Step title="Initial connection">
+    Connect your device via USB and tap "Trust This Computer" on your device.
+  </Step>
+
+  <Step title="Pairing record creation">
+    Your computer and device exchange cryptographic keys to establish trust. This creates a pairing record on your computer.
+  </Step>
+
+  <Step title="Record storage">
+    The pairing record is stored:
+    - **macOS**: `/var/db/lockdown/`
+    - **Linux**: `/var/lib/lockdown/`
+    - **Windows**: `%ProgramData%\Apple\Lockdown\`
+  </Step>
+
+  <Step title="Export for apps">
+    Impactor can extract this pairing record and format it for use by iOS apps.
+  </Step>
+</Steps>
+
+## Pairing file validity
+
+<Warning>
+  Pairing files become invalid when you:
+  - Reset or restore your device
+  - Update iOS (sometimes)
+  - Revoke computer trust on the device
+  - Choose "Reset Location & Privacy" in iOS settings
+  
+  After any of these events, you must re-trust your computer and generate a new pairing file.
+</Warning>
+
+## Supported applications
+
+Impactor can generate pairing files for these apps:
+
+<AccordionGroup>
+  <Accordion title="SideStore" icon="store">
+    **Purpose**: Wireless app sideloading using your Apple ID
+    
+    - Install and refresh apps over WiFi
+    - No USB connection needed after initial setup
+    - Uses your Apple Developer account credentials
+    - Automatically refreshes apps before they expire
+    
+    **How it works**: SideStore uses the pairing file to communicate with `installd` on your device, plus your P12 certificate to sign apps.
+    
+    Learn more: [github.com/SideStore/SideStore](https://github.com/SideStore/SideStore)
+  </Accordion>
+
+  <Accordion title="Feather" icon="feather">
+    **Purpose**: App sideloading using raw certificates
+    
+    - Alternative to SideStore
+    - Uses certificates instead of Apple ID
+    - More manual control over signing
+    - Good for privacy-conscious users
+    
+    Learn more: [github.com/khcrysalis/Feather](https://github.com/khcrysalis/Feather)
+  </Accordion>
+
+  <Accordion title="LiveContainer + SideStore" icon="container-storage">
+    **Purpose**: Run unsigned iOS apps in a container
+    
+    - Install multiple apps within one signed container
+    - Bypass 3-app limit on free accounts
+    - Uses JIT for better performance
+    - Requires both LiveContainer and SideStore setup
+    
+    Learn more: [github.com/LiveContainer/LiveContainer](https://github.com/LiveContainer/LiveContainer)
+  </Accordion>
+
+  <Accordion title="SparseBox" icon="palette">
+    **Purpose**: iOS device customization
+    
+    - Change device icons and themes
+    - Customize app badges
+    - Modify system appearance
+    - Works on non-jailbroken devices
+    
+    Learn more: [github.com/khanhduytran0/SparseBox](https://github.com/khanhduytran0/SparseBox)
+  </Accordion>
+
+  <Accordion title="Antrag" icon="list">
+    **Purpose**: List installed iOS applications
+    
+    - View all installed apps
+    - See bundle identifiers
+    - Inspect app metadata
+    - Useful for debugging
+    
+    Learn more: [github.com/khcrysalis/Antrag](https://github.com/khcrysalis/Antrag)
+  </Accordion>
+
+  <Accordion title="Protokolle" icon="scroll">
+    **Purpose**: System log viewing
+    
+    - Read iOS system logs
+    - Debug app crashes
+    - Monitor system processes
+    - Real-time log streaming
+    
+    Learn more: [github.com/khcrysalis/Protokolle](https://github.com/khcrysalis/Protokolle)
+  </Accordion>
+
+  <Accordion title="StikDebug" icon="bug">
+    **Purpose**: Enable JIT compilation
+    
+    - Activate Just-In-Time compilation for apps
+    - Dramatically improve emulator performance
+    - Required for apps like UTM, Delta, PPSSPP
+    - Must be enabled each time you launch an app
+    
+    Learn more: [github.com/StephenDev0/StikDebug](https://github.com/StephenDev0/StikDebug)
+  </Accordion>
+
+  <Accordion title="EnsWilde" icon="sparkles">
+    **Purpose**: Advanced device customization
+    
+    - More customization options than SparseBox
+    - Modify system behavior
+    - Change device settings
+    - Non-jailbreak customization
+    
+    Learn more: [github.com/YangJiiii/EnsWilde](https://github.com/YangJiiii/EnsWilde)
+  </Accordion>
+
+  <Accordion title="ByeTunes" icon="music">
+    **Purpose**: Music file management
+    
+    - Import MP3 files to Apple Music app
+    - Bypass iTunes sync requirement
+    - Organize music library
+    - Add custom music without Apple Music subscription
+    
+    Learn more: [github.com/EduAlexxis/ByeTunes](https://github.com/EduAlexxis/ByeTunes)
+  </Accordion>
+</AccordionGroup>
+
+## Generating pairing files with Impactor
+
+There are two ways to generate pairing files:
+
+<Tabs>
+  <Tab title="During app installation">
+    When you sideload a supported app (like SideStore), Impactor automatically:
+    
+    1. Detects the app needs a pairing file
+    2. Extracts your device's pairing record
+    3. Formats it for the specific app
+    4. Embeds it in the app bundle
+    
+    The app will work wirelessly immediately after installation.
+  </Tab>
+  
+  <Tab title="Via Utilities page">
+    You can also generate pairing files without installing apps:
+    
+    <Steps>
+      <Step title="Connect device">
+        Connect your iOS device via USB.
+      </Step>
+      
+      <Step title="Open Utilities">
+        Navigate to the **Utilities** page in Impactor.
+      </Step>
+      
+      <Step title="Select app">
+        Choose which app you want to generate a pairing file for.
+      </Step>
+      
+      <Step title="Install/Export">
+        Either install the app with pairing file, or export the pairing file for manual use.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Pairing file format
+
+Pairing files are typically in plist (property list) format:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>DeviceCertificate</key>
+    <data><!-- Base64 certificate --></data>
+    
+    <key>HostCertificate</key>
+    <data><!-- Base64 certificate --></data>
+    
+    <key>HostID</key>
+    <string><!-- UUID --></string>
+    
+    <key>RootCertificate</key>
+    <data><!-- Base64 certificate --></data>
+    
+    <key>WiFiMACAddress</key>
+    <string><!-- MAC address --></string>
+    
+    <key>SystemBUID</key>
+    <string><!-- System identifier --></string>
+</dict>
+</plist>
+```
+
+## Platform differences
+
+<Tabs>
+  <Tab title="macOS / Windows">
+    Full wireless functionality:
+    - WiFi-based device communication
+    - Background refresh works
+    - Apps can auto-refresh before expiration
+    - Seamless wireless experience
+  </Tab>
+  
+  <Tab title="Linux">
+    Limited wireless support:
+    
+    <Note>
+      On Linux, `usbmuxd` (the service that manages iOS devices) lacks full WiFi connectivity support. Auto-refresh only works when your device is plugged in via USB.
+      
+      Impactor is working on finding a proper solution for full wireless support on Linux.
+    </Note>
+    
+    **Workaround**: Keep your device plugged in when apps need refreshing, or manually refresh via USB connection.
+  </Tab>
+</Tabs>
+
+## Security considerations
+
+<Warning>
+  **Pairing files are sensitive credentials!**
+  
+  Anyone with access to your pairing file can:
+  - Install apps on your device
+  - Access device logs and information
+  - Modify certain device settings
+  - Potentially compromise your privacy
+  
+  **Never share your pairing file with untrusted parties.**
+</Warning>
+
+<AccordionGroup>
+  <Accordion title="What apps can do with pairing files">
+    Apps with your pairing file can:
+    - ✅ Install and remove apps
+    - ✅ Read device information (UDID, name, iOS version)
+    - ✅ Access system logs
+    - ✅ Communicate with device services
+    - ❌ Access your personal data (photos, messages, etc.)
+    - ❌ Jailbreak your device
+    - ❌ Modify core system files
+  </Accordion>
+
+  <Accordion title="Protecting your pairing file">
+    Best practices:
+    1. Only install pairing files for apps you trust
+    2. Keep pairing files in secure locations
+    3. Regenerate pairing files if you suspect compromise
+    4. Don't share pairing files over insecure channels
+    5. Revoke trust and regenerate if device is lost/stolen
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting pairing issues
+
+<AccordionGroup>
+  <Accordion title="App can't connect to device">
+    **Symptoms**: SideStore or other apps show "device not found" wirelessly
+    
+    **Solutions**:
+    - Ensure device and computer are on the same WiFi network
+    - Re-trust your computer on the iOS device
+    - Generate a new pairing file
+    - Restart both device and computer
+    - Check firewall settings aren't blocking communication
+  </Accordion>
+
+  <Accordion title="Pairing file invalid after iOS update">
+    **Symptoms**: Apps worked before iOS update, now fail to connect
+    
+    **Solutions**:
+    - iOS updates sometimes invalidate pairing files
+    - Connect device via USB
+    - Unlock device and re-trust computer if prompted
+    - Generate a new pairing file
+    - Re-install apps with new pairing file
+  </Accordion>
+
+  <Accordion title="Linux: Apps only work via USB">
+    **Symptoms**: Wireless connection never works on Linux
+    
+    **Solutions**:
+    - This is a known limitation of `usbmuxd` on Linux
+    - Keep device plugged in when apps need to communicate
+    - Use USB connection for app refresh operations
+    - Consider using macOS/Windows VM if wireless is critical
+  </Accordion>
+
+  <Accordion title="Multiple devices conflict">
+    **Symptoms**: Wrong device receives commands
+    
+    **Solutions**:
+    - Pairing files are device-specific
+    - Generate separate pairing files for each device
+    - Ensure apps are configured with correct pairing file
+    - Only one device should be actively using each pairing file
+  </Accordion>
+</AccordionGroup>
+
+## Advanced: Device utilities
+
+Impactor includes device utilities for managing pairing:
+
+<CardGroup cols={2}>
+  <Card title="Re-trust Device" icon="shield-check">
+    Forces a new trust dialog on your device, creating a fresh pairing record.
+    
+    Use when:
+    - Pairing file becomes corrupted
+    - Device won't connect
+    - After iOS restore
+  </Card>
+  
+  <Card title="Place Pairing File" icon="file-import">
+    Manually install a pairing file on the system.
+    
+    Use when:
+    - Transferring pairing files between computers
+    - Restoring from backup
+    - Setting up development environment
+  </Card>
+</CardGroup>
+
+<Note>
+  Access these utilities from the **Utilities** page when a device is connected to Impactor.
+</Note>

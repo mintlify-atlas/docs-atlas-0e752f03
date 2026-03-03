@@ -1,0 +1,327 @@
+---
+title: plumesign account
+description: Manage Apple Developer account authentication and resources
+---
+
+The `account` command manages Apple Developer account authentication, allowing you to log in, switch between accounts, and query account resources like certificates, devices, and app IDs.
+
+## Usage
+
+```bash
+plumesign account <SUBCOMMAND>
+```
+
+## Subcommands
+
+### login
+
+Authenticate with your Apple Developer account credentials.
+
+```bash
+plumesign account login [OPTIONS]
+```
+
+<ParamField path="--username" type="string">
+  Apple ID email address. If not provided, you'll be prompted to enter it.
+  
+  ```bash
+  plumesign account login --username user@example.com
+  ```
+</ParamField>
+
+<ParamField path="--password" type="string">
+  Apple ID password. If not provided, you'll be prompted to enter it securely.
+  
+  ```bash
+  plumesign account login --username user@example.com --password mypassword
+  ```
+</ParamField>
+
+<Note>
+If your account has two-factor authentication enabled (recommended), you'll be prompted to enter the 6-digit code during login.
+</Note>
+
+#### Example output
+
+```bash
+$ plumesign account login --username user@example.com
+Enter password: 
+Logging in...
+Enter 2FA code: 123456
+[2026-03-03T10:15:23Z INFO] Successfully logged in and account saved.
+```
+
+### logout
+
+Log out and remove the currently selected account.
+
+```bash
+plumesign account logout
+```
+
+<Warning>
+This removes the account from local storage. You'll need to log in again to use Apple ID signing.
+</Warning>
+
+#### Example output
+
+```bash
+$ plumesign account logout
+[2026-03-03T10:15:23Z INFO] Successfully logged out and removed account.
+```
+
+### list
+
+List all saved Apple Developer accounts.
+
+```bash
+plumesign account list
+```
+
+#### Example output
+
+```bash
+$ plumesign account list
+[2026-03-03T10:15:23Z INFO] Saved accounts:
+[2026-03-03T10:15:23Z INFO]  [John] john@example.com (selected)
+[2026-03-03T10:15:23Z INFO]  [Jane] jane@company.com
+```
+
+### switch
+
+Switch to a different saved account.
+
+```bash
+plumesign account switch <EMAIL>
+```
+
+<ParamField path="EMAIL" type="string" required>
+  Email address of the account to switch to.
+  
+  ```bash
+  plumesign account switch jane@company.com
+  ```
+</ParamField>
+
+#### Example output
+
+```bash
+$ plumesign account switch jane@company.com
+[2026-03-03T10:15:23Z INFO] Switched to account: jane@company.com
+```
+
+### certificates
+
+List certificates available in your Apple Developer account.
+
+```bash
+plumesign account certificates [OPTIONS]
+```
+
+<ParamField path="--team" type="string">
+  Team ID to list certificates for. If not provided, you'll be prompted to select from available teams.
+  
+  ```bash
+  plumesign account certificates --team ABC123DEF4
+  ```
+</ParamField>
+
+<ParamField path="--type" type="string">
+  Filter by certificate type: `development` or `distribution`.
+  
+  ```bash
+  plumesign account certificates --type development
+  ```
+</ParamField>
+
+#### Example output
+
+```bash
+$ plumesign account certificates
+[2026-03-03T10:15:23Z INFO] [
+    Certificate {
+        id: "ABC123",
+        name: "iOS Development",
+        serial_number: "1234567890ABCDEF",
+        expiration_date: "2027-03-03T10:15:23Z"
+    },
+    Certificate {
+        id: "DEF456",
+        name: "iOS Distribution",
+        serial_number: "FEDCBA0987654321",
+        expiration_date: "2027-03-03T10:15:23Z"
+    }
+]
+```
+
+### devices
+
+List devices registered to your Apple Developer account.
+
+```bash
+plumesign account devices [OPTIONS]
+```
+
+<ParamField path="--team" type="string">
+  Team ID to list devices for. If not provided, you'll be prompted to select from available teams.
+  
+  ```bash
+  plumesign account devices --team ABC123DEF4
+  ```
+</ParamField>
+
+<ParamField path="--platform" type="string">
+  Filter by device platform: `ios`, `tvos`, or `watchos`.
+  
+  ```bash
+  plumesign account devices --platform ios
+  ```
+</ParamField>
+
+#### Example output
+
+```bash
+$ plumesign account devices
+[2026-03-03T10:15:23Z INFO] [
+    Device {
+        id: "ABC123",
+        name: "iPhone 15 Pro",
+        udid: "00008030-001234567890123A",
+        platform: "ios",
+        status: "ENABLED"
+    },
+    Device {
+        id: "DEF456",
+        name: "iPad Pro",
+        udid: "00008020-001A2B3C4D5E6F7G",
+        platform: "ios",
+        status: "ENABLED"
+    }
+]
+```
+
+### register-device
+
+Register a new device to your Apple Developer account.
+
+```bash
+plumesign account register-device [OPTIONS] --udid <UDID> --name <NAME>
+```
+
+<ParamField path="--udid" type="string" required>
+  Device UDID to register.
+  
+  ```bash
+  plumesign account register-device --udid 00008030-001234567890123A --name "iPhone 15"
+  ```
+</ParamField>
+
+<ParamField path="--name" type="string" required>
+  Display name for the device.
+  
+  ```bash
+  plumesign account register-device --udid 00008030-001234567890123A --name "Test Device"
+  ```
+</ParamField>
+
+<ParamField path="--team" type="string">
+  Team ID to register the device under. If not provided, you'll be prompted to select from available teams.
+  
+  ```bash
+  plumesign account register-device --udid 00008030-001234567890123A --name "iPhone" --team ABC123DEF4
+  ```
+</ParamField>
+
+#### Example output
+
+```bash
+$ plumesign account register-device --udid 00008030-001234567890123A --name "iPhone 15"
+[2026-03-03T10:15:23Z INFO] Device {
+    id: "GHI789",
+    name: "iPhone 15",
+    udid: "00008030-001234567890123A",
+    platform: "ios",
+    status: "ENABLED"
+}
+```
+
+### app-ids
+
+List all app identifiers registered in your Apple Developer account.
+
+```bash
+plumesign account app-ids [OPTIONS]
+```
+
+<ParamField path="--team" type="string">
+  Team ID to list app IDs for. If not provided, you'll be prompted to select from available teams.
+  
+  ```bash
+  plumesign account app-ids --team ABC123DEF4
+  ```
+</ParamField>
+
+#### Example output
+
+```bash
+$ plumesign account app-ids
+[2026-03-03T10:15:23Z INFO] [
+    AppId {
+        id: "ABC123",
+        identifier: "com.company.app",
+        name: "MyApp",
+        platform: "ios"
+    },
+    AppId {
+        id: "DEF456",
+        identifier: "com.company.app2",
+        name: "AnotherApp",
+        platform: "ios"
+    }
+]
+```
+
+## Account storage
+
+Account credentials are stored in:
+
+- **macOS/Linux**: `~/.config/PlumeImpactor/accounts.json`
+- **Windows**: `%APPDATA%\PlumeImpactor\accounts.json`
+
+This file contains your authentication tokens and is used for subsequent signing operations.
+
+## Examples
+
+### Complete login workflow
+
+```bash
+# Login with username
+plumesign account login --username user@example.com
+
+# List saved accounts
+plumesign account list
+
+# View available devices
+plumesign account devices
+
+# Register a new device
+plumesign account register-device \
+  --udid 00008030-001234567890123A \
+  --name "Test iPhone"
+```
+
+### Switch between multiple accounts
+
+```bash
+# Login to first account
+plumesign account login --username personal@gmail.com
+
+# Login to second account
+plumesign account login --username work@company.com
+
+# List both accounts
+plumesign account list
+
+# Switch back to personal
+plumesign account switch personal@gmail.com
+```

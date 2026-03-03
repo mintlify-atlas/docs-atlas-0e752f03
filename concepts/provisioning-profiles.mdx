@@ -1,0 +1,313 @@
+---
+title: Provisioning profiles
+description: Understanding iOS provisioning profiles and entitlements
+---
+
+Provisioning profiles are binary files that authorize your iOS device to run specific signed applications. They link together your certificate, app, device, and requested permissions.
+
+## What is a provisioning profile?
+
+A provisioning profile is a signed property list (plist) file that contains:
+
+- **Certificate references** - Which certificates can sign this app
+- **Device UDIDs** - Which devices can run this app
+- **App identifier** - Which app this profile is for
+- **Entitlements** - What permissions the app has
+- **Expiration date** - When the profile becomes invalid
+- **Team identifier** - Your Apple Developer team ID
+
+<Info>
+  Think of a provisioning profile as a "permission slip" from Apple. It tells your iOS device: "This specific app, signed by this specific certificate, is allowed to run on this specific device with these specific permissions."
+</Info>
+
+## Profile structure
+
+Provisioning profiles use a special format:
+
+```rust
+fn extract_entitlements_from_prov(data: &[u8]) -> Result<(Dictionary, Date), Error> {
+    // Find the embedded plist XML between <plist> tags
+    let start = data
+        .windows(6)
+        .position(|w| w == b"<plist")
+        .ok_or(Error::ProvisioningEntitlementsUnknown)?;
+    let end = data
+        .windows(8)
+        .rposition(|w| w == b"</plist>")
+        .ok_or(Error::ProvisioningEntitlementsUnknown)?
+        + 8;
+    let plist_data = &data[start..end];
+    let plist = plist::Value::from_reader_xml(plist_data)?;
+}
+```
+
+The profile is a CMS (Cryptographic Message Syntax) signed blob containing an XML plist with all the authorization data.
+
+## Profile types
+
+<CardGroup cols={2}>
+  <Card title="Development Profile" icon="flask">
+    - Created by Impactor
+    - Limited to registered devices
+    - 7 days (free) or 1 year (paid)
+    - Can use development certificates
+  </Card>
+  
+  <Card title="Distribution Profile" icon="store">
+    - For App Store submissions
+    - Not used by Impactor
+    - Works on any device
+    - Requires paid developer account
+  </Card>
+  
+  <Card title="Ad Hoc Profile" icon="users">
+    - For beta testing
+    - Limited device list
+    - Not typically used for sideloading
+  </Card>
+  
+  <Card title="Enterprise Profile" icon="building">
+    - For organization distribution
+    - Not used by Impactor
+    - Requires enterprise account ($299/year)
+  </Card>
+</CardGroup>
+
+## How Impactor uses provisioning profiles
+
+<Steps>
+  <Step title="Request profile from Apple">
+    After registering your app and device, Impactor requests a provisioning profile:
+    
+    ```rust
+    pub async fn qh_get_profile(
+        &self,
+        team_id: &String,
+        app_id_id: &String,
+    ) -> Result<ProfilesResponse, Error> {
+        let endpoint = developer_endpoint!("/QH65B2/ios/downloadTeamProvisioningProfile.action");
+        
+        let mut body = Dictionary::new();
+        body.insert("teamId".to_string(), Value::String(team_id.clone()));
+        body.insert("appIdId".to_string(), Value::String(app_id_id.clone()));
+        
+        let response = self.qh_send_request(&endpoint, Some(body)).await?;
+    }
+    ```
+  </Step>
+
+  <Step title="Extract entitlements">
+    Impactor parses the profile to extract authorized entitlements:
+    
+    ```rust
+    pub struct Profile {
+        provisioning_profile_id: String,
+        name: String,
+        pub date_expire: Date,           // When profile expires
+        pub encoded_profile: Data,        // The binary profile data
+        pub filename: String,
+        uuid: String,                     // Unique profile identifier
+    }
+    ```
+  </Step>
+
+  <Step title="Merge with app entitlements">
+    The profile's entitlements are merged with those requested by the app:
+    
+    ```rust
+    pub fn merge_entitlements(
+        &mut self,
+        binary_path: PathBuf,
+        new_application_id: &str,
+    ) -> Result<(), Error> {
+        let macho = MachO::new(&binary_path)?;
+        let binary_entitlements = macho.entitlements().clone()?;
+        
+        let new_team_id = self
+            .entitlements
+            .get("com.apple.developer.team-identifier")
+            .and_then(Value::as_string)
+            .map(|s| s.to_owned());
+        
+        merge_entitlements(
+            &mut self.entitlements,
+            &binary_entitlements,
+            &new_team_id,
+            &Some(new_application_id.to_string()),
+        );
+    }
+    ```
+    
+    This ensures the app only gets entitlements it requests AND that are authorized by Apple.
+  </Step>
+
+  <Step title="Embed in signed app">
+    The provisioning profile is embedded in the app bundle at:
+    ```
+    YourApp.app/embedded.mobileprovision
+    ```
+    
+    iOS checks this file when launching the app to verify authorization.
+  </Step>
+</Steps>
+
+## Entitlements
+
+Entitlements are special permissions that apps can request:
+
+<AccordionGroup>
+  <Accordion title="Common entitlements">
+    ```xml
+    <key>application-identifier</key>
+    <string>TEAM_ID.com.example.app</string>
+    
+    <key>com.apple.developer.team-identifier</key>
+    <string>TEAM_ID</string>
+    
+    <key>get-task-allow</key>
+    <true/>  <!-- Allows debugging -->
+    
+    <key>keychain-access-groups</key>
+    <array>
+        <string>TEAM_ID.*</string>
+    </array>
+    ```
+  </Accordion>
+
+  <Accordion title="Advanced entitlements">
+    Some apps request special capabilities:
+    
+    - **Push Notifications**: `aps-environment`
+    - **iCloud**: `com.apple.developer.icloud-services`
+    - **App Groups**: `com.apple.security.application-groups`
+    - **Associated Domains**: `com.apple.developer.associated-domains`
+    - **Increased Memory**: `com.apple.developer.kernel.increased-memory-limit`
+    - **HealthKit**: `com.apple.developer.healthkit`
+    - **HomeKit**: `com.apple.developer.homekit`
+    
+    <Warning>
+      Free Apple Developer accounts cannot use most advanced entitlements. Requesting them will result in app installation failures.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="Entitlement extraction from apps">
+    Impactor reads entitlements directly from the app's main executable:
+    
+    ```rust
+    pub struct MachO {
+        // Represents a Mach-O binary (iOS/macOS executable)
+    }
+    
+    impl MachO {
+        pub fn entitlements(&self) -> Option<Dictionary> {
+            // Extract entitlements from __LINKEDIT section
+        }
+    }
+    ```
+    
+    This ensures the app gets exactly the permissions it was compiled with.
+  </Accordion>
+</AccordionGroup>
+
+## Profile expiration
+
+Provisioning profiles have expiration dates:
+
+```rust
+pub fn expiration_date(&self) -> &Date {
+    &self.expiration_date
+}
+```
+
+<Tabs>
+  <Tab title="Free Account">
+    - Profiles expire after **7 days**
+    - Apps stop working after expiration
+    - Must re-sign and reinstall apps weekly
+    - Certificates last 365 days, but profiles don't
+  </Tab>
+  
+  <Tab title="Paid Account">
+    - Profiles expire after **1 year**
+    - Much less frequent re-signing needed
+    - Certificates and profiles expire together
+  </Tab>
+</Tabs>
+
+<Info>
+  The 7-day limit on free accounts is Apple's way of discouraging sideloading and encouraging App Store distribution or paid developer memberships.
+</Info>
+
+## Bundle identifier matching
+
+Provisioning profiles are specific to app bundle identifiers:
+
+```rust
+pub fn bundle_id(&self) -> Option<String> {
+    let app_id = self
+        .entitlements
+        .get("application-identifier")?  // e.g., "ABCDE12345.com.example.app"
+        .as_string()?;
+    
+    let re = regex::Regex::new(TEAM_ID_REGEX).ok()?;
+    let bundle_id = re.replace(app_id, "").to_string();  // Strip team ID prefix
+    
+    Some(bundle_id)  // Returns "com.example.app"
+}
+```
+
+When you sideload an app:
+1. Impactor registers the app's bundle ID (e.g., `com.example.app`)
+2. Apple creates a profile for `TEAM_ID.com.example.app`
+3. The profile authorizes only that specific app
+
+<Note>
+  If you change an app's bundle identifier, you need a new provisioning profile. Impactor handles this automatically by registering a new App ID.
+</Note>
+
+## Troubleshooting profiles
+
+<AccordionGroup>
+  <Accordion title="Profile not valid for device">
+    This means your device UDID isn't included in the profile's authorized device list.
+    
+    **Solution**: Ensure your device is registered with Impactor. It should automatically register devices, but you can verify in Apple's developer portal.
+  </Accordion>
+
+  <Accordion title="Profile expired">
+    Free accounts have 7-day profiles that expire quickly.
+    
+    **Solution**: Re-sign and reinstall the app. Consider using auto-refresh features if available.
+  </Accordion>
+
+  <Accordion title="Entitlements not permitted">
+    The app requests entitlements your account type doesn't support.
+    
+    **Solution**: Use a paid developer account, or modify the app to remove restricted entitlements.
+  </Accordion>
+
+  <Accordion title="Profile/certificate mismatch">
+    The profile references a certificate you don't have the private key for.
+    
+    **Solution**: Delete the profile and let Impactor create a new one, or ensure you've copied the correct `key.pem` file.
+  </Accordion>
+</AccordionGroup>
+
+## Profile in app signing
+
+When Impactor signs your app, the provisioning profile is used to:
+
+1. **Determine entitlements** - What permissions to embed in the code signature
+2. **Verify authorization** - Confirm your certificate can sign this app
+3. **Embed in the app** - Include the profile as `embedded.mobileprovision`
+4. **Enable installation** - Tell iOS this device is authorized
+
+```rust
+pub fn entitlements_as_bytes(&self) -> Result<Vec<u8>, Error> {
+    let mut buf = Vec::new();
+    Value::Dictionary(self.entitlements.clone()).to_writer_xml(&mut buf)?;
+    Ok(buf)  // XML entitlements used during signing
+}
+```
+
+The entitlements from the profile are passed to the code signing tool, which embeds them in the app's code signature that iOS validates on launch.

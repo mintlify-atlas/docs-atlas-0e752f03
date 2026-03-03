@@ -1,0 +1,232 @@
+---
+title: plumesign sign
+description: Sign iOS app bundles and packages with certificates and provisioning profiles
+---
+
+The `sign` command signs iOS applications using either Apple ID credentials, PEM certificates, or ad-hoc signing. It can also register devices and install signed apps automatically.
+
+## Usage
+
+```bash
+plumesign sign [OPTIONS] --package <PACKAGE>
+```
+
+## Required arguments
+
+<ParamField path="--package" type="path" required>
+  Path to the app bundle or package to sign. Can be either:
+  - `.app` directory (signed in-place)
+  - `.ipa` file (requires `--output` unless using `--apple-id`)
+
+  ```bash
+  plumesign sign --package MyApp.ipa --apple-id
+  ```
+</ParamField>
+
+## Signing method
+
+Choose one signing method:
+
+<ParamField path="--apple-id" type="boolean">
+  Use Apple ID credentials for signing. Requires prior login via `plumesign account login`.
+  
+  This method automatically:
+  - Retrieves signing certificates from your Apple Developer account
+  - Registers the app bundle identifier
+  - Generates provisioning profiles
+  
+  ```bash
+  plumesign sign --package MyApp.ipa --apple-id --output signed.ipa
+  ```
+</ParamField>
+
+<ParamField path="--pem" type="path[]">
+  PEM files containing certificate and private key for signing. Can specify multiple files.
+  
+  ```bash
+  plumesign sign --package MyApp.ipa --pem cert.pem key.pem --output signed.ipa
+  ```
+</ParamField>
+
+<Note>
+If neither `--apple-id` nor `--pem` is specified, the app will be signed ad-hoc (without a certificate).
+</Note>
+
+## Provisioning profile
+
+<ParamField path="--provision" type="path">
+  Provisioning profile file (.mobileprovision) to embed in the signed app.
+  
+  ```bash
+  plumesign sign --package MyApp.ipa --pem cert.pem --provision profile.mobileprovision --output signed.ipa
+  ```
+</ParamField>
+
+## Bundle customization
+
+<ParamField path="--custom-identifier" type="string">
+  Override the bundle identifier in Info.plist.
+  
+  ```bash
+  plumesign sign --package MyApp.ipa --custom-identifier com.company.newapp --apple-id
+  ```
+</ParamField>
+
+<ParamField path="--custom-name" type="string">
+  Override the bundle display name.
+  
+  ```bash
+  plumesign sign --package MyApp.ipa --custom-name "My Custom App" --apple-id
+  ```
+</ParamField>
+
+<ParamField path="--custom-version" type="string">
+  Override the bundle version.
+  
+  ```bash
+  plumesign sign --package MyApp.ipa --custom-version "2.0.0" --apple-id
+  ```
+</ParamField>
+
+## Tweaks
+
+<ParamField path="--tweaks" type="path[]">
+  Paths to tweak files to inject into the app during signing. Can specify multiple tweaks.
+  
+  ```bash
+  plumesign sign --package MyApp.ipa --tweaks tweak1.dylib tweak2.dylib --apple-id
+  ```
+</ParamField>
+
+## Device registration and installation
+
+<ParamField path="--register-and-install" type="boolean">
+  Register the device with your Apple Developer account and install the signed app.
+  
+  Only works with `--apple-id`. Will prompt for device selection if `--udid` is not provided.
+  
+  ```bash
+  plumesign sign --package MyApp.ipa --apple-id --register-and-install
+  ```
+</ParamField>
+
+<ParamField path="--udid" type="string">
+  Specific device UDID to register and install to. Used with `--register-and-install`.
+  
+  ```bash
+  plumesign sign --package MyApp.ipa --apple-id --register-and-install --udid 00008030-001234567890123A
+  ```
+</ParamField>
+
+<ParamField path="--mac" type="boolean">
+  Install to connected Mac instead of iOS device (arm64 Macs only).
+  
+  Conflicts with `--udid`. Only available on Apple Silicon Macs.
+  
+  ```bash
+  plumesign sign --package MyApp.ipa --apple-id --register-and-install --mac
+  ```
+</ParamField>
+
+## Output
+
+<ParamField path="--output" type="path">
+  Output path for the signed .ipa file.
+  
+  **Required** when:
+  - Signing an .ipa file without `--apple-id` (ad-hoc or PEM signing)
+  
+  **Ignored** when:
+  - Signing an .app directory (always signed in-place)
+  
+  ```bash
+  plumesign sign --package MyApp.ipa --pem cert.pem --output signed.ipa
+  ```
+</ParamField>
+
+<Warning>
+When signing .app directories, the bundle is modified in-place. The `--output` flag has no effect for .app bundles.
+</Warning>
+
+## Examples
+
+### Sign with Apple ID
+
+```bash
+plumesign sign --package MyApp.ipa --apple-id --output signed.ipa
+```
+
+### Sign with PEM certificate
+
+```bash
+plumesign sign --package MyApp.ipa \
+  --pem certificate.pem privatekey.pem \
+  --provision profile.mobileprovision \
+  --output signed.ipa
+```
+
+### Ad-hoc signing
+
+```bash
+plumesign sign --package MyApp.ipa --output signed.ipa
+```
+
+### Sign and install to device
+
+```bash
+plumesign sign --package MyApp.ipa \
+  --apple-id \
+  --register-and-install \
+  --udid 00008030-001234567890123A
+```
+
+### Sign with custom bundle info
+
+```bash
+plumesign sign --package MyApp.ipa \
+  --apple-id \
+  --custom-identifier com.mycompany.app \
+  --custom-name "My App" \
+  --custom-version "1.0.0" \
+  --output signed.ipa
+```
+
+### Sign in-place (.app bundle)
+
+```bash
+plumesign sign --package MyApp.app --apple-id
+```
+
+## Terminal output
+
+<CodeGroup>
+```bash Successful signing
+$ plumesign sign --package MyApp.ipa --apple-id --output signed.ipa
+[2026-03-03T10:15:23Z INFO] Restoring session for user@example.com...
+[2026-03-03T10:15:24Z INFO] Modifying bundle...
+[2026-03-03T10:15:25Z INFO] Registering bundle identifier...
+[2026-03-03T10:15:26Z INFO] Signing bundle...
+[2026-03-03T10:15:28Z INFO] Saved signed package to: signed.ipa
+```
+
+```bash In-place signing warning
+$ plumesign sign --package MyApp.app --apple-id --output ignored.ipa
+[2026-03-03T10:15:23Z WARN] ⚠️  Signing bundle in place: MyApp.app
+[2026-03-03T10:15:23Z WARN] Note: -o/--output flag is ignored for .app bundles (in-place signing only)
+[2026-03-03T10:15:24Z INFO] Restoring session for user@example.com...
+[2026-03-03T10:15:25Z INFO] Signing bundle...
+```
+
+```bash With device registration
+$ plumesign sign --package MyApp.ipa --apple-id --register-and-install
+[2026-03-03T10:15:23Z INFO] Restoring session for user@example.com...
+[2026-03-03T10:15:24Z INFO] Signing bundle...
+[2026-03-03T10:15:25Z INFO] Registering device: iPhone 15 Pro (00008030-001234567890123A)
+[2026-03-03T10:15:26Z INFO] Installing to device: iPhone 15 Pro
+[2026-03-03T10:15:27Z INFO] Installation progress: 25%
+[2026-03-03T10:15:28Z INFO] Installation progress: 50%
+[2026-03-03T10:15:29Z INFO] Installation progress: 75%
+[2026-03-03T10:15:30Z INFO] Installation progress: 100%
+[2026-03-03T10:15:30Z INFO] Installation complete!
+```
+</CodeGroup>

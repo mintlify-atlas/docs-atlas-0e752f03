@@ -1,0 +1,244 @@
+---
+title: Pairing file generation
+description: Generate and install pairing files for remote device communication
+---
+
+Impactor can generate pairing files that allow apps to communicate with your iOS device remotely over WiFi. This is essential for apps like SideStore, Feather, and other sideloading tools.
+
+## What is a pairing file?
+
+A pairing file (`.mobiledevicepairing` or `.plist`) contains:
+
+- Device-specific certificates and keys
+- Trusted credentials for lockdown communication
+- WiFi debugging authorization
+- UDID and device identification
+
+These files enable apps to perform operations like app installation, file access, and system queries without requiring a direct USB connection.
+
+<Warning>
+  Pairing files become invalid if you:
+  - Untrust your computer on the device
+  - Reset or restore your device
+  - Update iOS (in some cases)
+</Warning>
+
+## Supported applications
+
+Impactor automatically generates and installs pairing files for these apps:
+
+| Application | Bundle ID | File Path |
+|-------------|-----------|----------|
+| SideStore | `com.SideStore.SideStore` | `/Documents/ALTPairingFile.mobiledevicepairing` |
+| Feather | `thewonderofyou.Feather` | `/Documents/pairingFile.plist` |
+| LiveContainer | `com.kdt.livecontainer` | `/Documents/SideStore/Documents/ALTPairingFile.mobiledevicepairing` |
+| Antrag | `thewonderofyou.antrag2` | `/Documents/pairingFile.plist` |
+| Protokolle | `thewonderofyou.syslog` | `/Documents/pairingFile.plist` |
+| StikDebug | `com.stik.sj` | `/Documents/pairingFile.plist` |
+| SparseBox | `com.kdt.SparseBox` | `/Documents/pairingFile.plist` |
+| EnsWilde | `com.yangjiii.EnsWilde` | `/Documents/pairingFile.plist` |
+| ByeTunes | `com.EduAlexxis.MusicManager` | `/Documents/pairing file/pairingFile.plist` |
+
+## How pairing file generation works
+
+<Steps>
+  <Step title="Retrieve pairing record">
+    Impactor retrieves the existing pairing record from usbmuxd:
+    
+    ```rust
+    // From plume_utils/src/device.rs:171
+    let mut pairing_file = usbmuxd.get_pair_record(&self.udid).await?;
+    ```
+  </Step>
+
+  <Step title="Enable WiFi debugging">
+    WiFi debugging must be enabled for remote communication:
+    
+    ```rust
+    // From plume_utils/src/device.rs:177
+    lc.set_value(
+        "EnableWifiDebugging",
+        true.into(),
+        Some("com.apple.mobile.wireless_lockdown"),
+    ).await.ok();
+    ```
+  </Step>
+
+  <Step title="Add device UDID">
+    The device's UDID is added to the pairing file:
+    
+    ```rust
+    pairing_file.udid = Some(self.udid.clone());
+    ```
+  </Step>
+
+  <Step title="Install to app container">
+    The pairing file is written to the app's Documents directory using House Arrest:
+    
+    ```rust
+    // From plume_utils/src/device.rs:187
+    let hc = HouseArrestClient::connect(&provider).await?;
+    let mut ac = hc.vend_documents(identifier.clone()).await?;
+    ```
+  </Step>
+</Steps>
+
+## Automatic installation
+
+Impactor automatically detects supported apps and installs pairing files during sideloading:
+
+1. **App detection** - Impactor identifies the app by bundle ID or name
+2. **Path determination** - The correct file path is selected based on the app
+3. **Directory creation** - Parent directories are created if needed
+4. **File installation** - The pairing file is written to the app's container
+
+```rust
+// From plume_utils/src/options.rs:276
+pub fn pairing_file_path(&self) -> Option<&'static str> {
+    match self {
+        SideStore => Some("/Documents/ALTPairingFile.mobiledevicepairing"),
+        Antrag | Feather | Protokolle => Some("/Documents/pairingFile.plist"),
+        LiveContainer => Some("/Documents/SideStore/Documents/ALTPairingFile.mobiledevicepairing"),
+        // ...
+    }
+}
+```
+
+## Manual pairing file installation
+
+You can manually install pairing files using the Utilities page:
+
+<Steps>
+  <Step title="Connect device">
+    Connect your iOS device via USB and ensure it appears in Impactor.
+  </Step>
+
+  <Step title="Open Utilities">
+    Navigate to the Utilities page in Impactor.
+  </Step>
+
+  <Step title="Select app">
+    Choose the app you want to install a pairing file for.
+  </Step>
+
+  <Step title="Install">
+    Click "Install Pairing File" and Impactor will handle the rest.
+  </Step>
+</Steps>
+
+<Note>
+  The device must be trusted and unlocked for pairing file installation to succeed.
+</Note>
+
+## Re-trusting your device
+
+If you need to generate a new pairing record:
+
+```rust
+// From plume_utils/src/device.rs:132
+pub async fn pair(&self) -> Result<(), Error> {
+    let mut lc = LockdownClient::connect(&provider).await?;
+    let id = uuid::Uuid::new_v4().to_string().to_uppercase();
+    let buid = usbmuxd.get_buid().await?;
+    let mut pairing_file = lc.pair(id, buid).await?;
+    pairing_file.udid = Some(self.udid.clone());
+    let pairing_file = pairing_file.serialize()?;
+    usbmuxd.save_pair_record(&self.udid, pairing_file).await?;
+}
+```
+
+This creates a new trust relationship between your computer and device.
+
+## Technical implementation
+
+### House Arrest protocol
+
+Impactor uses the House Arrest service to access app containers:
+
+```rust
+// Connect to House Arrest
+let hc = HouseArrestClient::connect(&provider).await?;
+// Access app's Documents directory
+let mut ac = hc.vend_documents(identifier.clone()).await?;
+```
+
+This provides secure file system access to the app's sandbox.
+
+### Directory creation
+
+Nested directories are created automatically:
+
+```rust
+// From plume_utils/src/device.rs:193
+if let Some(parent) = Path::new(path).parent() {
+    for component in parent.components() {
+        if let Component::Normal(dir) = component {
+            current.push_str(&dir.to_string_lossy());
+            ac.mk_dir(&current).await?;
+        }
+    }
+}
+```
+
+This ensures paths like `/Documents/SideStore/Documents/` are fully created.
+
+### File writing
+
+The pairing file is written atomically:
+
+```rust
+let mut f = ac.open(path, AfcFopenMode::Wr).await?;
+f.write_entire(&pairing_file.serialize().unwrap()).await?;
+```
+
+## Verifying installation
+
+After installation, you can verify the pairing file:
+
+1. Open the app on your device
+2. Check for WiFi connectivity features
+3. For SideStore: Navigate to Settings → Check "WiFi Sync"
+4. For Feather: Verify the pairing file appears in Settings
+
+## Troubleshooting
+
+### Pairing file not working
+
+- Ensure WiFi debugging is enabled
+- Verify the device is on the same network
+- Check that the pairing file hasn't expired
+- Re-trust your device and regenerate the file
+
+### "Device not paired" error
+
+- Connect via USB and unlock your device
+- Trust your computer when prompted
+- Use Impactor's "Re-trust Device" utility
+
+### App can't find pairing file
+
+- Verify the file path matches the app's expectations
+- Check file permissions in the app container
+- Reinstall the app and pairing file together
+
+## Security considerations
+
+<Warning>
+  Pairing files contain sensitive credentials. Never share them publicly or commit them to version control.
+</Warning>
+
+- Pairing files grant full access to your device
+- They can be used to install apps, read files, and access system information
+- Store them securely and regenerate them if compromised
+- Each device has unique pairing files
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="P12 Export" icon="certificate" href="/advanced/p12-export">
+    Export certificates for LiveContainer
+  </Card>
+  <Card title="Device Utilities" icon="wrench" href="/essentials/device-utilities">
+    Learn about device management features
+  </Card>
+</CardGroup>

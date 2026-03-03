@@ -1,0 +1,227 @@
+---
+title: Windows
+description: Install and use Impactor on Windows with iTunes driver support
+---
+
+Impactor provides full Windows support through native 64-bit builds. The application requires iTunes to be installed for device communication drivers.
+
+## Installation
+
+Impactor is available in both portable and installer formats for Windows.
+
+<Steps>
+  <Step title="Download from releases">
+    Visit [GitHub releases](https://github.com/khcrysalis/PlumeImpactor/releases) and download either:
+    
+    - **Portable**: `Impactor-windows-x86_64-portable.exe` - No installation required
+    - **Installer**: `Impactor-windows-x86_64-setup.exe` - Installs to Program Files with Start Menu shortcuts
+  </Step>
+  
+  <Step title="Install iTunes (required)">
+    <Warning>
+      iTunes must be installed for Impactor to communicate with iOS devices. The iTunes drivers are required for device detection.
+    </Warning>
+    
+    Download iTunes from [Apple Support](https://support.apple.com/en-us/106372) and install it.
+    
+    <Info>
+      You don't need to run iTunes, but the drivers must be installed on your system.
+    </Info>
+  </Step>
+  
+  <Step title="Launch Impactor">
+    - **Portable**: Run the downloaded `.exe` file directly
+    - **Installer**: Launch from Start Menu or Desktop shortcut
+  </Step>
+</Steps>
+
+## System requirements
+
+- **Operating System**: Windows 10 or Windows 11
+- **Architecture**: 64-bit (x86_64) only
+- **Required Software**: [iTunes](https://support.apple.com/en-us/106372) for device drivers
+- **Optional**: Windows SDK (only for building from source)
+
+## Installation methods
+
+### Portable version
+
+The portable version requires no installation:
+
+- Single executable file
+- Can run from any location
+- No registry modifications
+- Ideal for USB drives or temporary usage
+
+### NSIS Installer version
+
+The installer provides a traditional Windows installation:
+
+- Installs to `C:\Program Files\PlumeImpactor`
+- Creates Start Menu shortcuts
+- Creates Desktop shortcut
+- Includes uninstaller
+- Registers in Windows Apps & Features
+
+## Build requirements
+
+To build Impactor from source on Windows, you need:
+
+- [Rust](https://rustup.rs/) toolchain
+- [CMake](https://cmake.org/download/) and a C++ compiler
+- [Visual Studio 2022 Build Tools](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)
+- Windows 10/11 SDK
+
+### Building from source
+
+```powershell
+# Clone the repository
+git clone https://github.com/khcrysalis/PlumeImpactor.git
+cd PlumeImpactor
+
+# Build the GUI application
+cargo run --bin plumeimpactor
+
+# Build the CLI tool
+cargo run --bin plumesign -- <args>
+
+# Create a release build
+make windows PROFILE=release
+
+# Build with NSIS installer (requires NSIS installed)
+make windows PROFILE=release NSIS=1
+```
+
+Built binaries will be available in the `dist/` directory.
+
+### Cross-compilation from Linux
+
+Windows binaries can be built from Linux using MinGW:
+
+```bash
+# Install MinGW
+sudo apt-get install mingw-w64
+
+# Add Windows target
+rustup target add x86_64-pc-windows-gnu
+
+# Build for Windows
+cargo build --bins --workspace --release --target x86_64-pc-windows-gnu
+```
+
+## Features
+
+Impactor on Windows includes all core features:
+
+- Sign and sideload iOS apps to connected devices
+- Auto-refresh functionality for keeping apps up to date
+- System tray integration
+- Support for both light and dark modes
+- Native Windows UI with proper HiDPI support
+- Secure credential storage
+
+## Troubleshooting
+
+### Device not detected
+
+If your iOS device is not being detected:
+
+<Steps>
+  <Step title="Verify iTunes is installed">
+    Ensure iTunes is properly installed:
+    
+    1. Open **Settings** > **Apps** > **Installed apps**
+    2. Search for "iTunes"
+    3. If not found, download and install from [Apple Support](https://support.apple.com/en-us/106372)
+  </Step>
+  
+  <Step title="Check Apple Mobile Device Service">
+    Verify the device service is running:
+    
+    1. Press `Win + R` and type `services.msc`
+    2. Find **Apple Mobile Device Service**
+    3. Ensure it's running and set to **Automatic**
+    4. If stopped, right-click and select **Start**
+  </Step>
+  
+  <Step title="Trust the device">
+    Ensure your iOS device is unlocked and you've tapped **Trust** when the prompt appears.
+  </Step>
+  
+  <Step title="Restart services">
+    Try restarting the Apple device services:
+    
+    ```powershell
+    # Run as Administrator
+    net stop "Apple Mobile Device Service"
+    net start "Apple Mobile Device Service"
+    ```
+  </Step>
+  
+  <Step title="Try a different USB port">
+    Some USB 3.0 ports can cause issues. Try:
+    
+    - Using a different USB port
+    - Using a USB 2.0 port instead of USB 3.0
+    - Using a different cable
+  </Step>
+</Steps>
+
+### Windows Defender / antivirus warnings
+
+If Windows Defender flags Impactor:
+
+<Info>
+  Impactor is open-source and safe. Some antivirus software may flag it as suspicious due to its device communication capabilities.
+</Info>
+
+1. Click **More info** in the Windows Defender prompt
+2. Click **Run anyway**
+3. Optionally, add Impactor to your antivirus exclusions
+
+### Signing issues on Windows
+
+If you encounter signing errors:
+
+1. Ensure iTunes is properly installed with all components
+2. Try running Impactor as Administrator
+3. Check that your Apple ID credentials are correct
+4. Verify your device is unlocked during the signing process
+
+### Application won't start
+
+If Impactor fails to launch:
+
+<Steps>
+  <Step title="Check Windows version">
+    Impactor requires Windows 10 or later. Windows 7 and 8 are not supported.
+  </Step>
+  
+  <Step title="Install Visual C++ Redistributables">
+    Download and install the latest:
+    
+    [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
+  </Step>
+  
+  <Step title="Check for conflicts">
+    Close other iOS management tools:
+    
+    - iTunes (if running)
+    - Other sideloading tools
+    - iCloud
+    
+    Then restart Impactor.
+  </Step>
+</Steps>
+
+### Dark mode support
+
+Impactor supports Windows dark mode:
+
+1. Open **Settings** > **Personalization** > **Colors**
+2. Select **Dark** under "Choose your mode"
+3. Restart Impactor for changes to take effect
+
+<Info>
+  Dark mode support was added in version 1.3.0. Ensure you're using the latest version for the best experience.
+</Info>

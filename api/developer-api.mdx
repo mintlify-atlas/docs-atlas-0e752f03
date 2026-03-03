@@ -1,0 +1,386 @@
+---
+title: Apple Developer API
+description: Manage apps, devices, and provisioning profiles with plume_core::developer
+---
+
+The developer module provides a client for interacting with Apple's Developer API to manage app IDs, devices, provisioning profiles, and certificates.
+
+## DeveloperSession
+
+```rust
+pub struct DeveloperSession {
+    anisette: Arc<Mutex<AnisetteData>>,
+    client: Client,
+    adsid: String,
+    xcode_gs_token: String,
+}
+```
+
+Represents an authenticated session with Apple's Developer API.
+
+### Creating a session
+
+<CodeGroup>
+```rust From authenticated account
+use plume_core::auth::Account;
+use plume_core::developer::DeveloperSession;
+
+// After authenticating with Account::login()
+let session = DeveloperSession::using_account(account).await?;
+```
+
+```rust From stored credentials
+use plume_core::developer::DeveloperSession;
+use omnisette::AnisetteConfiguration;
+
+let session = DeveloperSession::new(
+    adsid,
+    xcode_gs_token,
+    AnisetteConfiguration::default()
+).await?;
+```
+</CodeGroup>
+
+### Methods
+
+<ParamField path="using_account" type="async fn">
+  ```rust
+  pub async fn using_account(account: Account) -> Result<Self, Error>
+  ```
+  
+  Creates a developer session from an authenticated Account
+</ParamField>
+
+<ParamField path="new" type="async fn">
+  ```rust
+  pub async fn new(
+      adsid: String,
+      xcode_gs_token: String,
+      config: AnisetteConfiguration,
+  ) -> Result<Self, Error>
+  ```
+  
+  Creates a session with stored credentials. Validates the session by listing teams.
+</ParamField>
+
+<ParamField path="adsid" type="fn">
+  ```rust
+  pub fn adsid(&self) -> &String
+  ```
+  
+  Returns the Apple Directory Services ID for this session
+</ParamField>
+
+<ParamField path="xcode_gs_token" type="fn">
+  ```rust
+  pub fn xcode_gs_token(&self) -> &String
+  ```
+  
+  Returns the Xcode GrandSlam token for this session
+</ParamField>
+
+## Teams
+
+Manage Apple Developer teams associated with the account.
+
+<ParamField path="qh_list_teams" type="async fn">
+  ```rust
+  pub async fn qh_list_teams(&self) -> Result<TeamsResponse, Error>
+  ```
+  
+  Lists all teams associated with the developer account
+</ParamField>
+
+### Team response
+
+```rust
+pub struct Team {
+    pub status: String,
+    pub name: String,
+    pub team_id: String,
+    pub _type: String,
+}
+```
+
+<CodeGroup>
+```rust Example
+let teams = session.qh_list_teams().await?;
+for team in teams.teams {
+    println!("Team: {} ({})", team.name, team.team_id);
+}
+```
+</CodeGroup>
+
+## App IDs
+
+Manage application identifiers and their capabilities.
+
+<ParamField path="qh_list_app_ids" type="async fn">
+  ```rust
+  pub async fn qh_list_app_ids(
+      &self,
+      team_id: &String
+  ) -> Result<AppIDsResponse, Error>
+  ```
+  
+  Lists all app IDs for a team
+</ParamField>
+
+<ParamField path="qh_add_app_id" type="async fn">
+  ```rust
+  pub async fn qh_add_app_id(
+      &self,
+      team_id: &String,
+      name: &String,
+      identifier: &String,
+  ) -> Result<AppIDResponse, Error>
+  ```
+  
+  Creates a new app ID with the specified bundle identifier
+</ParamField>
+
+<ParamField path="qh_get_app_id" type="async fn">
+  ```rust
+  pub async fn qh_get_app_id(
+      &self,
+      team_id: &String,
+      identifier: &String,
+  ) -> Result<Option<AppID>, Error>
+  ```
+  
+  Retrieves a specific app ID by bundle identifier
+</ParamField>
+
+<ParamField path="qh_ensure_app_id" type="async fn">
+  ```rust
+  pub async fn qh_ensure_app_id(
+      &self,
+      team_id: &String,
+      name: &String,
+      identifier: &String,
+  ) -> Result<AppID, Error>
+  ```
+  
+  Gets an existing app ID or creates it if it doesn't exist
+</ParamField>
+
+<ParamField path="qh_delete_app_id" type="async fn">
+  ```rust
+  pub async fn qh_delete_app_id(
+      &self,
+      team_id: &String,
+      app_id_id: &String,
+  ) -> Result<QHResponseMeta, Error>
+  ```
+  
+  Deletes an app ID
+</ParamField>
+
+<ParamField path="qh_update_app_id" type="async fn">
+  ```rust
+  pub async fn qh_update_app_id(
+      &self,
+      team_id: &String,
+      app_id_id: &String,
+      features: Dictionary,
+  ) -> Result<AppIDResponse, Error>
+  ```
+  
+  Updates app ID capabilities (push notifications, iCloud, etc.)
+</ParamField>
+
+### AppID struct
+
+```rust
+pub struct AppID {
+    pub app_id_id: String,
+    pub identifier: String,
+    // ... other fields
+}
+```
+
+<CodeGroup>
+```rust Example: Create app ID
+let team_id = "ABC123XYZ".to_string();
+let app_id = session.qh_ensure_app_id(
+    &team_id,
+    &"My App".to_string(),
+    &"com.example.myapp".to_string()
+).await?;
+
+println!("App ID: {}", app_id.app_id_id);
+```
+</CodeGroup>
+
+## App groups
+
+Manage app group identifiers for shared data between apps.
+
+<ParamField path="qh_ensure_app_group" type="async fn">
+  ```rust
+  pub async fn qh_ensure_app_group(
+      &self,
+      team_id: &String,
+      name: &String,
+      identifier: &String,
+  ) -> Result<ApplicationGroup, Error>
+  ```
+  
+  Creates or retrieves an app group
+</ParamField>
+
+<ParamField path="qh_assign_app_group" type="async fn">
+  ```rust
+  pub async fn qh_assign_app_group(
+      &self,
+      team_id: &String,
+      app_id_id: &String,
+      app_group_ids: &[String],
+  ) -> Result<QHResponseMeta, Error>
+  ```
+  
+  Assigns app groups to an app ID
+</ParamField>
+
+## Provisioning profiles
+
+<ParamField path="qh_get_profile" type="async fn">
+  ```rust
+  pub async fn qh_get_profile(
+      &self,
+      team_id: &String,
+      app_id_id: &String,
+  ) -> Result<ProfileResponse, Error>
+  ```
+  
+  Generates and retrieves a provisioning profile for an app ID
+</ParamField>
+
+<CodeGroup>
+```rust Example
+let profile = session.qh_get_profile(&team_id, &app_id.app_id_id).await?;
+let profile_data = profile.provisioning_profile.encoded_profile;
+
+tokio::fs::write("embedded.mobileprovision", &profile_data).await?;
+```
+</CodeGroup>
+
+## Devices
+
+Manage registered development devices.
+
+<ParamField path="qh_list_devices" type="async fn">
+  ```rust
+  pub async fn qh_list_devices(
+      &self,
+      team_id: &String
+  ) -> Result<DevicesResponse, Error>
+  ```
+  
+  Lists all registered devices for a team
+</ParamField>
+
+<ParamField path="qh_add_device" type="async fn">
+  ```rust
+  pub async fn qh_add_device(
+      &self,
+      team_id: &String,
+      name: &String,
+      udid: &String,
+  ) -> Result<DeviceResponse, Error>
+  ```
+  
+  Registers a new device with its UDID
+</ParamField>
+
+## Request types
+
+```rust
+pub enum RequestType {
+    Get,
+    Post,
+    Patch,
+}
+```
+
+Specifies the HTTP method for API requests.
+
+## Low-level API methods
+
+<ParamField path="qh_send_request" type="async fn">
+  ```rust
+  pub async fn qh_send_request(
+      &self,
+      url: &str,
+      body: Option<Dictionary>,
+  ) -> Result<Dictionary, Error>
+  ```
+  
+  Sends a request to the QuickHelp (QH) API endpoint
+</ParamField>
+
+<ParamField path="v1_send_request" type="async fn">
+  ```rust
+  pub async fn v1_send_request(
+      &self,
+      url: &str,
+      body: Option<serde_json::Value>,
+      request_type: Option<RequestType>,
+  ) -> Result<serde_json::Value, Error>
+  ```
+  
+  Sends a request to the v1 API endpoint with JSON payload
+</ParamField>
+
+## Capabilities
+
+<ParamField path="v1_request_capabilities_for_entitlements" type="async fn">
+  ```rust
+  pub async fn v1_request_capabilities_for_entitlements(
+      &self,
+      team_id: &String,
+      identifier: &String,
+      entitlements: &plist::Dictionary,
+  ) -> Result<(), Error>
+  ```
+  
+  Automatically enables required capabilities based on app entitlements
+</ParamField>
+
+## Example: Complete workflow
+
+<CodeGroup>
+```rust Register and provision app
+use plume_core::developer::DeveloperSession;
+
+#[tokio::main]
+async fn main() -> Result<(), plume_core::Error> {
+    let session = DeveloperSession::using_account(account).await?;
+    
+    // Get team
+    let teams = session.qh_list_teams().await?;
+    let team_id = &teams.teams[0].team_id;
+    
+    // Create app ID
+    let app_id = session.qh_ensure_app_id(
+        team_id,
+        &"My App".to_string(),
+        &"com.example.myapp".to_string()
+    ).await?;
+    
+    // Get provisioning profile
+    let profile = session.qh_get_profile(
+        team_id,
+        &app_id.app_id_id
+    ).await?;
+    
+    // Save profile
+    tokio::fs::write(
+        "embedded.mobileprovision",
+        &profile.provisioning_profile.encoded_profile
+    ).await?;
+    
+    Ok(())
+}
+```
+</CodeGroup>

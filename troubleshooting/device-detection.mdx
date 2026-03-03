@@ -1,0 +1,294 @@
+---
+title: Device detection problems
+description: Troubleshooting guide for when Impactor cannot detect your iOS device
+---
+
+## Verify device connection
+
+Before troubleshooting, ensure your device is properly connected:
+
+1. Device is unlocked
+2. USB cable is functional (try a different cable if available)
+3. Device shows a charging indicator when plugged in
+4. You've tapped "Trust This Computer" on the device
+
+## Platform-specific detection issues
+
+### Linux device detection
+
+Linux relies on `usbmuxd` for device communication. Detection issues are often related to usbmuxd configuration or udev rules.
+
+<Accordion title="Check if usbmuxd is running">
+  Verify that usbmuxd is active on your system:
+  
+  ```bash
+  systemctl status usbmuxd
+  ```
+  
+  If not running, start it:
+  ```bash
+  sudo systemctl start usbmuxd
+  ```
+  
+  To enable it permanently:
+  ```bash
+  sudo systemctl enable usbmuxd
+  ```
+</Accordion>
+
+<Accordion title="usbmuxd stops running after disconnecting device">
+  Some distributions configure udev rules that stop usbmuxd when no devices are connected.
+  
+  **Solution:**
+  1. Plug in your device first
+  2. Then launch Impactor
+  3. The device should be detected immediately
+  
+  This is expected behavior on some distributions and not a bug.
+</Accordion>
+
+<Accordion title="Permission denied errors">
+  Your user may not have permissions to access USB devices.
+  
+  **Solution:**
+  Add your user to the plugdev group:
+  ```bash
+  sudo usermod -aG plugdev $USER
+  ```
+  
+  Then log out and log back in for changes to take effect.
+</Accordion>
+
+<Accordion title="Bazzite and Fedora-based distributions">
+  These distributions may require updated crypto policies:
+  
+  ```bash
+  sudo update-crypto-policies
+  ```
+  
+  After running this command, restart usbmuxd:
+  ```bash
+  sudo systemctl restart usbmuxd
+  ```
+  
+  Then reconnect your device.
+</Accordion>
+
+<Accordion title="Custom udev rules needed">
+  Some distributions may need custom udev rules for iOS devices.
+  
+  Create a file `/etc/udev/rules.d/39-usbmuxd.rules` with:
+  ```
+  SUBSYSTEM=="usb", ATTR{idVendor}=="05ac", ATTR{idProduct}=="12[9a][0-9a-f]", MODE="0660", GROUP="plugdev"
+  ```
+  
+  Reload udev rules:
+  ```bash
+  sudo udevadm control --reload-rules
+  sudo udevadm trigger
+  ```
+</Accordion>
+
+### Windows device detection
+
+<Warning>
+  iTunes from the Microsoft Store does **not** include the necessary drivers. You must install iTunes directly from Apple.
+</Warning>
+
+<Accordion title="iTunes drivers not installed">
+  Impactor requires iTunes drivers to communicate with iOS devices on Windows.
+  
+  **Solution:**
+  1. Download [iTunes from Apple](https://support.apple.com/en-us/106372) (not Microsoft Store)
+  2. Install iTunes
+  3. Restart your computer
+  4. Connect your device
+  5. Restart Impactor
+</Accordion>
+
+<Accordion title="iTunes installed but device not detected">
+  The Apple Mobile Device USB Driver may not be running.
+  
+  **Solution:**
+  1. Press Win+R and type `services.msc`
+  2. Find "Apple Mobile Device Service"
+  3. Right-click and select "Start" if it's stopped
+  4. Set Startup Type to "Automatic"
+  5. Reconnect your device
+</Accordion>
+
+<Accordion title="Driver conflicts with other software">
+  Other iOS management software may interfere with device drivers.
+  
+  **Solution:**
+  - Close other iOS management tools (3uTools, iMazing, etc.)
+  - Restart the Apple Mobile Device Service
+  - Try using a different USB port (USB 3.0 ports are recommended)
+</Accordion>
+
+### macOS device detection
+
+<Accordion title="Device not appearing in Impactor">
+  macOS generally has the best device detection, but issues can still occur.
+  
+  **Solution:**
+  1. Disconnect and reconnect the device
+  2. Restart Impactor
+  3. Check System Settings > Privacy & Security for any device access prompts
+  4. Try a different USB port or cable
+</Accordion>
+
+<Accordion title="macOS ARM (M1/M2/M3) specific issues">
+  On Apple Silicon Macs, iOS app installation uses a special wrapper structure.
+  
+  If installation fails with bundle copy errors:
+  1. Verify you have write permissions to `/Applications/iOS`
+  2. Check available disk space
+  3. Ensure Impactor has Full Disk Access in System Settings > Privacy & Security
+</Accordion>
+
+## Connection type issues
+
+<Accordion title="USB vs WiFi connectivity">
+  Impactor displays the connection type in brackets:
+  - `[USB]` - Direct USB connection
+  - `[WiFi]` - Network connection
+  - `[Unknown]` - Connection type couldn't be determined
+  
+  <Note>
+    On Linux, WiFi connectivity is limited due to usbmuxd constraints. Auto-refresh only works with USB connections.
+  </Note>
+</Accordion>
+
+<Accordion title="WiFi sync not working">
+  For WiFi device connections:
+  
+  **Requirements:**
+  - Device and computer on the same network
+  - WiFi sync enabled in iTunes/Finder
+  - Device previously paired via USB
+  
+  **Solution:**
+  1. Connect device via USB first
+  2. Trust the computer on the device
+  3. Enable WiFi sync in your device settings
+  4. Keep both devices on the same network
+</Accordion>
+
+## Pairing and trust issues
+
+<Accordion title="Device not trusted">
+  You must trust the computer on your iOS device.
+  
+  **Solution:**
+  1. Disconnect the device
+  2. Reconnect the device
+  3. Look for "Trust This Computer?" prompt on device
+  4. Tap "Trust"
+  5. Enter your device passcode
+  6. Wait a few seconds, then check Impactor
+</Accordion>
+
+<Accordion title="Re-pairing required after iOS update">
+  iOS updates often invalidate the pairing file.
+  
+  **Solution:**
+  Use the "Pair" utility in Impactor:
+  1. Connect your device
+  2. Go to Utilities page
+  3. Click "Trust/Pair Device"
+  4. Follow the prompts
+</Accordion>
+
+<Accordion title="Pairing file location issues">
+  Pairing files are stored by the system:
+  - **macOS**: `~/Library/Lockdown/`
+  - **Linux**: `/var/lib/lockdown/` or `~/.local/share/lockdown/`
+  - **Windows**: `%ProgramData%\Apple\Lockdown\`
+  
+  If pairing files are corrupted:
+  1. Delete the existing pairing files for your device
+  2. Reconnect and re-trust the device
+  3. Pair again using Impactor utilities
+</Accordion>
+
+## Multiple devices
+
+<Accordion title="Multiple devices connected">
+  Impactor can work with multiple devices simultaneously.
+  
+  **To select a device:**
+  1. All connected devices appear in the device list
+  2. Each device shows connection type `[USB]` or `[WiFi]` and device name
+  3. Select the device you want to work with from the list
+</Accordion>
+
+<Accordion title="Device ID conflicts">
+  In rare cases, device IDs may conflict.
+  
+  **Solution:**
+  1. Disconnect all devices
+  2. Connect only the device you want to use
+  3. Complete your task
+  4. Reconnect other devices
+</Accordion>
+
+## Advanced troubleshooting
+
+<Accordion title="Verify usbmuxd can see the device (Linux)">
+  Check if usbmuxd detects your device:
+  
+  ```bash
+  usbmuxd -f -v
+  ```
+  
+  You should see log entries when plugging/unplugging the device.
+</Accordion>
+
+<Accordion title="Check device UDID">
+  Impactor uses the device UDID for identification.
+  
+  To find your device UDID:
+  - **macOS/Windows**: Use iTunes or Finder
+  - **Linux**: Use `idevice_id -l`
+  
+  If the UDID shows as "00008XXX-XXXX..." your device is properly detected by the system.
+</Accordion>
+
+<Accordion title="Test with idevice command-line tools">
+  Install libimobiledevice tools to test device connectivity:
+  
+  ```bash
+  # List devices
+  idevice_id -l
+  
+  # Get device info
+  ideviceinfo
+  
+  # Check device pairing
+  idevicepair pair
+  ```
+  
+  If these commands work, the issue is specific to Impactor. If they fail, it's a system-level problem.
+</Accordion>
+
+## Still not working?
+
+If your device still isn't detected:
+
+1. Try a different USB cable (Apple-certified cables work best)
+2. Try a different USB port (avoid USB hubs)
+3. Restart your device
+4. Restart your computer
+5. Check for Impactor updates
+6. Review the error logs in Impactor (if available)
+7. Search [GitHub Issues](https://github.com/khcrysalis/PlumeImpactor/issues) for your specific device model
+
+<Tip>
+  When reporting device detection issues, include:
+  - Your operating system and version
+  - Device model and iOS version
+  - Connection type (USB/WiFi)
+  - Any error messages from Impactor
+  - Output from `idevice_id -l` (Linux/macOS)
+</Tip>

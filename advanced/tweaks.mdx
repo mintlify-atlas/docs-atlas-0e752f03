@@ -1,0 +1,196 @@
+---
+title: Tweak injection with ElleKit
+description: Learn how to inject tweaks into iOS applications using ElleKit for advanced customization
+---
+
+Impactor supports injecting tweaks into iOS applications using [ElleKit](https://github.com/tealbathingsuit/ellekit), a modern code injection framework. This allows you to modify app behavior and add custom functionality.
+
+## Supported tweak formats
+
+Impactor can inject multiple types of tweak files:
+
+- **`.deb`** - Debian packages containing tweaks
+- **`.dylib`** - Dynamic libraries for direct injection
+- **`.framework`** - Framework bundles
+- **`.bundle`** - Resource bundles
+- **`.appex`** - App extensions
+
+## How tweak injection works
+
+<Steps>
+  <Step title="ElleKit installation">
+    Impactor automatically installs ElleKit into your app bundle when tweaks are enabled. ElleKit is embedded directly and handles runtime injection.
+    
+    ```rust
+    // From plume_utils/src/tweak.rs:20
+    pub async fn install_ellekit(app_bundle: &Bundle) -> Result<(), Error>
+    ```
+  </Step>
+
+  <Step title="Tweak extraction">
+    For `.deb` files, Impactor extracts the archive and scans for injectable components in standard locations:
+    
+    - `Library/MobileSubstrate/DynamicLibraries`
+    - `usr/lib`
+    - `Library/Frameworks`
+    - `var/jb/Library/MobileSubstrate/DynamicLibraries`
+    - `var/jb/usr/lib`
+  </Step>
+
+  <Step title="Component installation">
+    Extracted components are installed to the appropriate locations:
+    
+    - `.dylib` files → `Frameworks/` directory
+    - `.framework` bundles → `Frameworks/` directory
+    - `.bundle` bundles → App bundle root
+    - `.appex` extensions → `PlugIns/` directory
+  </Step>
+
+  <Step title="MachO injection">
+    Dynamic libraries are injected into the app's main executable using `@rpath` references:
+    
+    ```rust
+    // Dylib injection path
+    format!("@rpath/{}", file_name)
+    
+    // Framework injection path
+    format!("@rpath/{}/{}", framework_name, executable_name)
+    ```
+  </Step>
+</Steps>
+
+## CydiaSubstrate compatibility
+
+Impactor automatically patches CydiaSubstrate references to use ElleKit for iOS 26.0 compatibility:
+
+```rust
+// From plume_utils/src/tweak.rs:310
+fn patch_cydiasubstrate(binary_path: &Path) {
+    if let Ok(mut macho) = MachO::new(binary_path) {
+        let _ = macho.replace_dylib(
+            "/Library/Frameworks/CydiaSubstrate.framework/CydiaSubstrate",
+            "@rpath/CydiaSubstrate.framework/CydiaSubstrate",
+        );
+    }
+}
+```
+
+This ensures tweaks designed for CydiaSubstrate work seamlessly with ElleKit.
+
+## Using tweaks via the UI
+
+In the Impactor interface:
+
+1. Select your IPA file
+2. Enable "ElleKit Support" in the customization options
+3. Add tweak files (`.deb`, `.dylib`, etc.)
+4. Impactor will automatically inject them during signing
+
+## Using tweaks via CLI
+
+With the command-line interface:
+
+```bash
+plumesign sign \
+  --input app.ipa \
+  --output signed.ipa \
+  --tweak tweak.deb \
+  --tweak custom.dylib
+```
+
+<Note>
+  ElleKit is automatically installed when you enable tweak support or add any tweak files. You don't need to manually include ElleKit.
+</Note>
+
+## Advanced usage
+
+### Direct dylib injection
+
+For standalone `.dylib` files:
+
+```bash
+plumesign sign --input app.ipa --tweak MyTweak.dylib
+```
+
+The dylib is copied to `Frameworks/` and injected into the main executable.
+
+### Framework injection
+
+For `.framework` bundles:
+
+```bash
+plumesign sign --input app.ipa --tweak CustomFramework.framework
+```
+
+The framework is copied to `Frameworks/` and its main executable is injected with proper `@rpath` references.
+
+### Multiple tweaks
+
+You can inject multiple tweaks simultaneously:
+
+```bash
+plumesign sign \
+  --input app.ipa \
+  --tweak tweak1.deb \
+  --tweak tweak2.dylib \
+  --tweak framework.framework
+```
+
+<Warning>
+  Not all tweaks are compatible with all apps. Some tweaks may cause crashes or unexpected behavior. Always test thoroughly.
+</Warning>
+
+## Technical details
+
+### Injection mechanism
+
+Impactor modifies the app's Mach-O executable to load tweaks at runtime:
+
+1. Parses the main executable's Mach-O header
+2. Adds `LC_LOAD_DYLIB` load commands for each tweak
+3. Updates the binary with proper code signatures
+4. ElleKit handles runtime initialization
+
+### Staging directory
+
+Tweaks are processed in a temporary staging directory:
+
+```rust
+let stage_dir = env::temp_dir().join(format!("plume_tweak_{}", Uuid::new_v4()));
+```
+
+This ensures clean extraction and prevents conflicts between multiple injection operations.
+
+### Recursive scanning
+
+For `.deb` packages, Impactor recursively scans all directories to find injectable components, ensuring no tweaks are missed even if they're in non-standard locations.
+
+## Troubleshooting
+
+### Tweak not loading
+
+- Verify the tweak is compatible with your iOS version
+- Check that ElleKit is properly installed in the app bundle
+- Ensure the tweak's dependencies are included
+
+### App crashes after injection
+
+- The tweak may be incompatible with the target app
+- Try injecting tweaks one at a time to identify the problematic one
+- Check device logs for crash information
+
+### CydiaSubstrate errors
+
+- Ensure CydiaSubstrate patching is enabled (it's automatic)
+- Verify the tweak is designed for CydiaSubstrate or ElleKit
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Entitlements" icon="shield-check" href="/advanced/entitlements">
+    Learn about entitlement handling
+  </Card>
+  <Card title="AppSync" icon="arrow-down-to-line" href="/advanced/appsync">
+    Install unsigned apps with AppSync
+  </Card>
+</CardGroup>

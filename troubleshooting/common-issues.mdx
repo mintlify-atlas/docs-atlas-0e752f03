@@ -1,0 +1,227 @@
+---
+title: Common issues
+description: Solutions to frequently encountered problems when using Impactor
+---
+
+## Platform-specific requirements
+
+### Linux: usbmuxd not detecting devices
+
+On Linux systems, `usbmuxd` is required for device communication. While it comes pre-installed on most distributions, you may encounter detection issues.
+
+<Accordion title="Device not detected after plugging in">
+  Due to udev rules on some distributions, `usbmuxd` may stop running when no devices are connected.
+  
+  **Solution:**
+  1. Plug in your iOS device first
+  2. Restart Impactor
+  3. The device should now be detected
+</Accordion>
+
+<Accordion title="usbmuxd not detecting device after system update">
+  Some distributions like Bazzite may need updated crypto policies.
+  
+  **Solution:**
+  ```bash
+  sudo update-crypto-policies
+  ```
+  
+  Then reconnect your device.
+</Accordion>
+
+<Note>
+  Auto-refresh on Linux works differently than macOS/Windows due to `usbmuxd` lacking WiFi connectivity support. Auto-refresh only works when a device is physically connected via USB.
+</Note>
+
+### Windows: iTunes drivers missing
+
+Impactor requires iTunes drivers to communicate with Apple devices on Windows.
+
+<Warning>
+  You must install iTunes from Apple, not the Microsoft Store version. The Store version does not include the necessary drivers.
+</Warning>
+
+**Solution:**
+1. Download [iTunes from Apple](https://support.apple.com/en-us/106372)
+2. Install iTunes
+3. Restart Impactor
+4. Connect your device
+
+## Authentication issues
+
+### Two-factor authentication (2FA) errors
+
+<Accordion title="2FA code not accepted">
+  If your 2FA code is rejected, this may be due to timing or rate limiting.
+  
+  **Solution:**
+  - Wait 30 seconds before requesting a new code
+  - Ensure you're entering the code immediately after receiving it
+  - If you receive a 423 HTTP error, wait several minutes before trying again
+  
+  The error type in the code: `Bad2faCode`
+</Accordion>
+
+<Accordion title="Stuck on 'Needs device 2FA' or 'Needs SMS 2FA'">
+  Authentication may require additional steps depending on your Apple ID security settings.
+  
+  **Solution:**
+  1. Check if you received a notification on your trusted devices
+  2. For SMS 2FA, ensure you have access to your trusted phone number
+  3. If authentication continues to fail, you may need to complete extra security steps in your Apple ID settings
+</Accordion>
+
+### Session and credential errors
+
+<Accordion title="Developer session request failed">
+  This occurs when Impactor cannot establish a session with Apple's developer APIs.
+  
+  **Possible causes:**
+  - Network connectivity issues
+  - Apple ID credentials expired
+  - Account security settings changed
+  
+  **Solution:**
+  1. Check your internet connection
+  2. Log out and log back in with your Apple ID
+  3. Verify your account at [appleid.apple.com](https://appleid.apple.com)
+</Accordion>
+
+<Accordion title="Authentication SRP error">
+  Secure Remote Password (SRP) errors indicate problems with the authentication handshake.
+  
+  **Common error codes:**
+  - Invalid credentials provided
+  - Authentication service temporarily unavailable
+  
+  **Solution:**
+  - Double-check your Apple ID email and password
+  - Ensure you're using your Apple ID, not a third-party email
+  - Wait a few minutes and try again if Apple's services are experiencing issues
+</Accordion>
+
+## Installation and app issues
+
+<Accordion title="App fails to install on device">
+  Installation failures can occur for several reasons.
+  
+  **Solution:**
+  1. Ensure your device is unlocked during installation
+  2. Check that you have enough storage space
+  3. Verify the device is trusted (you may need to tap "Trust" on the device)
+  4. Try restarting both Impactor and your device
+</Accordion>
+
+<Accordion title="Bundle executable missing error">
+  This error means the IPA file is missing its main executable.
+  
+  **Solution:**
+  - Verify the IPA file is not corrupted
+  - Try downloading the IPA again from the source
+  - Ensure the IPA was properly extracted (if you modified it)
+</Accordion>
+
+<Accordion title="Bundle failed to rename/copy error">
+  Occurs when Impactor cannot access or modify the app bundle.
+  
+  **Solution:**
+  - Check file permissions on the IPA
+  - Ensure the IPA is not open in another application
+  - On macOS ARM, verify you have write permissions to `/Applications/iOS`
+  - Try moving the IPA to a different location
+</Accordion>
+
+## Certificate and provisioning issues
+
+<Accordion title="Too many certificates error">
+  Free Apple Developer accounts are limited to a maximum number of certificates.
+  
+  **Solution:**
+  Impactor automatically attempts to revoke old certificates. If this fails:
+  1. Log in to [developer.apple.com](https://developer.apple.com/account/resources/certificates/list)
+  2. Manually revoke unused certificates
+  3. Try signing again
+  
+  The error code in the API: `7460`
+</Accordion>
+
+<Accordion title="Provisioning profile errors">
+  Issues with provisioning profiles can prevent app installation.
+  
+  **Solution:**
+  - Ensure your device is registered with your Apple ID
+  - Check that the app's bundle identifier matches the profile
+  - Try deleting and recreating the provisioning profile
+</Accordion>
+
+## Network and API errors
+
+<Accordion title="Developer API error messages">
+  You may encounter API errors when communicating with Apple's servers.
+  
+  **Common causes:**
+  - Network interruptions
+  - Apple service outages
+  - Rate limiting
+  - Invalid API responses
+  
+  **Solution:**
+  1. Check [Apple System Status](https://www.apple.com/support/systemstatus/)
+  2. Verify your internet connection is stable
+  3. Wait a few minutes and retry
+  4. If the error persists, check the error code and message for specific guidance
+</Accordion>
+
+<Accordion title="Reqwest/network errors">
+  HTTP client errors indicate network communication problems.
+  
+  **Solution:**
+  - Check your firewall settings
+  - Verify you can reach Apple's servers
+  - If using a proxy, ensure it's configured correctly
+  - Disable VPN temporarily to test
+</Accordion>
+
+## File and resource errors
+
+<Accordion title="Info.plist not found">
+  The app's Info.plist file is missing or inaccessible.
+  
+  **Solution:**
+  - Verify the IPA structure is correct
+  - Extract the IPA and check for `Info.plist` in the app bundle
+  - Ensure the IPA wasn't corrupted during download
+</Accordion>
+
+<Accordion title="Tweak extraction failed">
+  Occurs when injecting tweaks into the app.
+  
+  **Possible causes:**
+  - Invalid tweak file format
+  - Corrupted .deb or .dylib file
+  - Unsupported file type
+  
+  **Solution:**
+  - Verify the tweak file is compatible
+  - Try a different tweak to isolate the issue
+  - Check that the file extension is correct (.deb or .dylib)
+</Accordion>
+
+<Accordion title="I/O errors">
+  File system operations failed.
+  
+  **Solution:**
+  - Check available disk space
+  - Verify file permissions
+  - Ensure the path is accessible
+  - Try running Impactor with appropriate permissions
+</Accordion>
+
+## Additional resources
+
+If you continue to experience issues:
+
+- Check the [GitHub Issues](https://github.com/khcrysalis/PlumeImpactor/issues) for similar problems
+- Review device-specific troubleshooting in [Device detection](/troubleshooting/device-detection)
+- See signing-specific issues in [Signing errors](/troubleshooting/signing-errors)
+- Join the community discussions for help

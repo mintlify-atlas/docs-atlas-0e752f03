@@ -1,0 +1,186 @@
+---
+title: plumesign device
+description: Install apps to iOS devices and manage device pairing
+---
+
+The `device` command installs iOS applications to connected devices and manages device pairing records. It supports both .ipa packages and .app bundles.
+
+## Usage
+
+```bash
+plumesign device [OPTIONS]
+```
+
+## Device selection
+
+<ParamField path="--udid" type="string">
+  Device UDID to target. If not provided, you'll be prompted to select from connected devices.
+  
+  Conflicts with `--mac`.
+  
+  ```bash
+  plumesign device --udid 00008030-001234567890123A --install MyApp.ipa
+  ```
+</ParamField>
+
+<ParamField path="--mac" type="boolean">
+  Install to connected Mac instead of iOS device (arm64 Macs only).
+  
+  Conflicts with `--udid`. Only available on Apple Silicon Macs running macOS.
+  
+  ```bash
+  plumesign device --mac --install MyApp.ipa
+  ```
+</ParamField>
+
+<Note>
+If neither `--udid` nor `--mac` is specified, you'll be prompted to select from all connected devices.
+</Note>
+
+## Installation
+
+<ParamField path="--install" type="path">
+  Path to app bundle or package to install. Supports both:
+  - `.ipa` package files
+  - `.app` bundle directories
+  
+  ```bash
+  plumesign device --install MyApp.ipa
+  ```
+</ParamField>
+
+## Pairing record management
+
+<ParamField path="--pairing" type="boolean">
+  Install a pairing record to the device. Requires `--pairing-path`.
+  
+  Conflicts with `--mac`.
+  
+  ```bash
+  plumesign device --pairing --pairing-path ~/Documents/pairingFile.plist
+  ```
+</ParamField>
+
+<ParamField path="--pairing-path" type="path">
+  Path to the pairing record file (.plist) to install. Required when `--pairing` is used.
+  
+  ```bash
+  plumesign device --pairing --pairing-path ~/Documents/pairingFile.plist
+  ```
+</ParamField>
+
+<ParamField path="--pairing-app-identifier" type="string">
+  Bundle identifier of the app to use for pairing record installation.
+  
+  If not provided, you'll be prompted to select from installed apps on the device.
+  
+  ```bash
+  plumesign device \
+    --pairing \
+    --pairing-path ~/Documents/pairingFile.plist \
+    --pairing-app-identifier com.company.app
+  ```
+</ParamField>
+
+## Examples
+
+### Install IPA to specific device
+
+```bash
+plumesign device --udid 00008030-001234567890123A --install MyApp.ipa
+```
+
+### Install to Mac
+
+```bash
+plumesign device --mac --install MyApp.ipa
+```
+
+### Install app bundle
+
+```bash
+plumesign device --install MyApp.app
+```
+
+### Interactive device selection
+
+```bash
+# Prompts you to select from connected devices
+plumesign device --install MyApp.ipa
+```
+
+### Install pairing record
+
+```bash
+plumesign device \
+  --udid 00008030-001234567890123A \
+  --pairing \
+  --pairing-path ~/Documents/pairingFile.plist \
+  --pairing-app-identifier com.company.app
+```
+
+### Install app and pairing record
+
+```bash
+plumesign device \
+  --udid 00008030-001234567890123A \
+  --install MyApp.ipa \
+  --pairing \
+  --pairing-path ~/Documents/pairingFile.plist
+```
+
+## Terminal output
+
+<CodeGroup>
+```bash Successful installation
+$ plumesign device --install MyApp.ipa
+Select a device to register and install to
+> iPhone 15 Pro (00008030-001234567890123A)
+  iPad Pro (00008020-001A2B3C4D5E6F7G)
+
+[2026-03-03T10:15:23Z INFO] Installing app at "MyApp.app" to device iPhone 15 Pro
+[2026-03-03T10:15:24Z INFO] 25
+[2026-03-03T10:15:25Z INFO] 50
+[2026-03-03T10:15:26Z INFO] 75
+[2026-03-03T10:15:27Z INFO] 100
+```
+
+```bash Mac installation
+$ plumesign device --mac --install MyApp.ipa
+[2026-03-03T10:15:23Z INFO] Installing app at "MyApp.app" to connected Mac
+```
+
+```bash Pairing record installation
+$ plumesign device --pairing --pairing-path ~/pairingFile.plist
+Select a device to register and install to
+> iPhone 15 Pro (00008030-001234567890123A)
+
+Select an installed app
+> com.company.myapp
+  com.company.otherapp
+
+[2026-03-03T10:15:23Z INFO] Installing pairing record from "~/pairingFile.plist" to device iPhone 15 Pro
+```
+
+```bash No devices connected
+$ plumesign device --install MyApp.ipa
+Error: No devices connected. Please connect a device or specify a UDID with --device-udid
+```
+</CodeGroup>
+
+## Device discovery
+
+The device command automatically discovers connected iOS devices via usbmuxd. On macOS, this works through the built-in usbmuxd service. On Linux and Windows, you may need to install and run usbmuxd separately.
+
+### Finding device UDID
+
+You can find a device's UDID by:
+
+1. Running `plumesign device --install <app>` and noting the UDID in the selection prompt
+2. Using Finder on macOS (click on device in sidebar)
+3. Using iTunes on Windows
+4. Using `idevice_id -l` if you have libimobiledevice installed
+
+<Warning>
+Device installation requires the device to be connected via USB and trusted with your computer. You may need to unlock the device and tap "Trust" when prompted.
+</Warning>

@@ -1,0 +1,199 @@
+---
+title: "Sideloading apps via GUI"
+description: "Step-by-step guide for installing IPA files to iOS devices using the Impactor GUI"
+---
+
+The Impactor GUI makes it easy to install IPA and TIPA files to your iOS device. This guide walks you through the complete installation process.
+
+## Prerequisites
+
+Before you begin:
+
+- iOS device connected via USB
+- IPA or TIPA file ready to install
+- Apple account configured (for standard signing mode)
+- Device trusted and paired with your computer
+
+<Tip>
+If this is your first time connecting your device, you'll need to trust it first. See the [device utilities guide](/gui/device-utilities) for pairing instructions.
+</Tip>
+
+## Installation workflow
+
+<Steps>
+
+<Step title="Select your app package">
+  Choose your IPA or TIPA file using one of these methods:
+  
+  - **Drag and drop** the file directly onto the main screen
+  - Click **Import .ipa / .tipa** to open a file picker
+  
+  The file picker filters for `.ipa` and `.tipa` extensions automatically.
+</Step>
+
+<Step title="Configure app properties">
+  In the installer screen, you can customize the app before installation:
+  
+  **Basic information:**
+  - **Name**: Change the display name shown on your home screen
+  - **Identifier**: Modify the bundle identifier (useful for installing multiple copies)
+  - **Version**: Update the version string
+  - **Icon**: Replace the app icon with a custom image (PNG/JPG)
+  
+  Click the app icon preview to set or clear a custom icon.
+</Step>
+
+<Step title="Add tweaks and bundles (optional)">
+  Inject additional functionality:
+  
+  - Click **Add Tweak** to select `.deb` or `.dylib` files
+  - Click **Add Bundle** to add frameworks, bundles, or app extensions (`.framework`, `.bundle`, `.appex`)
+  
+  Added items appear in a scrollable list where you can remove them individually.
+</Step>
+
+<Step title="Configure features">
+  Enable optional feature modifications:
+  
+  **General features:**
+  - **Support older versions (7+)**: Allow installation on iOS 7 and later
+  - **Force File Sharing**: Enable iTunes file sharing
+  - **Force iPad Fullscreen**: Use full screen on iPad
+  - **Force Game Mode**: Enable Game Mode optimization
+  - **Force Pro Motion**: Enable 120Hz refresh rate support
+  
+  **Advanced features:**
+  - **Only Register Main Bundle**: Register only the main app bundle (enables custom entitlements)
+  - **Force Liquid Glass (26+)**: Enable Liquid Glass effects on iOS 26+
+  - **Replace Substrate with ElleKit**: Swap Substrate tweaks to use ElleKit
+  - **Auto Refresh [BETA]**: Automatically refresh the app signature before expiration
+</Step>
+
+<Step title="Set custom entitlements (optional)">
+  If you enabled **Only Register Main Bundle**, you can provide custom entitlements:
+  
+  - Click the **+** button next to "Entitlements"
+  - Select a `.plist` or `.xml` entitlements file
+  - The file name will display in gray when the feature is disabled
+  
+  <Note>
+  Custom entitlements are only available when "Only Register Main Bundle" is enabled.
+  </Note>
+</Step>
+
+<Step title="Choose installation mode">
+  Select how you want to handle the package:
+  
+  - **Install**: Sign and install directly to the connected device
+  - **Export**: Sign and save the IPA without installing
+  
+  The Install button is only enabled when a device is connected.
+</Step>
+
+<Step title="Select signing method">
+  Choose your signing approach:
+  
+  - **Pem**: Use your Apple account certificate (requires login)
+  - **Adhoc**: Ad-hoc signing without an Apple account
+  - **None**: No signing applied
+  
+  <Warning>
+  If you select **Pem** mode without being logged in, you'll be prompted to authenticate before installation begins.
+  </Warning>
+</Step>
+
+<Step title="Start installation">
+  Click **Install** (or **Export** if you chose export mode).
+  
+  The app will:
+  1. Prompt for Apple login if needed
+  2. Navigate to the progress screen
+  3. Display real-time progress with status messages
+  4. Show a completion dialog when finished
+  
+  <Warning>
+  Do not disconnect your device during installation. The progress bar and status text show the current operation.
+  </Warning>
+</Step>
+
+</Steps>
+
+## Progress tracking
+
+During installation, the progress screen displays:
+
+- **Progress bar**: Visual indicator from 0-100%
+- **Status messages**: Current operation details
+- **Progress percentage**: Numeric completion indicator
+
+### Status indicators
+
+- **0-100%**: Installation in progress
+- **100%**: Installation complete
+- **-1 (error)**: Installation failed - a dialog will show the error details
+
+<Info>
+The Back button is disabled during active installation to prevent interruption.
+</Info>
+
+## Auto-refresh feature
+
+When you enable **Auto Refresh** during installation:
+
+1. The app is registered for automatic signature renewal
+2. Impactor monitors the device connection in the background
+3. When the device reconnects, apps are refreshed automatically before expiration
+4. Notifications appear on refresh success or failure
+
+### Managing auto-refresh apps
+
+Auto-refresh apps appear in the system tray menu:
+
+- **Refresh now**: Manually trigger an immediate refresh
+- **Forget app**: Remove from auto-refresh and delete cached files
+
+<Note>
+Auto-refresh is a beta feature. Apps must remain on the device and the device must connect periodically for refresh to occur.
+</Note>
+
+## Troubleshooting
+
+### Installation fails with login error
+
+If you see authentication errors:
+
+1. Go to [Settings](/gui/settings)
+2. Add or re-authenticate your Apple account
+3. Return to the installer and try again
+
+### Device not detected
+
+- Ensure the device is connected via USB
+- Trust the computer on your device when prompted
+- Try the **Trust Device** option in [Utilities](/gui/device-utilities)
+
+### Custom icon not applied
+
+- Ensure the image is PNG or JPG format
+- The icon loads asynchronously - a loading indicator (⏳) appears while loading
+- Click the icon preview to reselect if needed
+
+### Tweaks not working
+
+- Verify tweak compatibility with your iOS version
+- Check that ElleKit option matches your tweak's injection framework
+- Some tweaks may conflict - try installing individually
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Device utilities" icon="wrench" href="/gui/device-utilities">
+  Manage pairing files and view installed apps.
+</Card>
+
+<Card title="Settings" icon="gear" href="/gui/settings">
+  Configure accounts and application preferences.
+</Card>
+
+</CardGroup>

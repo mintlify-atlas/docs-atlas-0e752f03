@@ -1,0 +1,234 @@
+---
+title: "Device utilities"
+description: "Manage device pairing, view installed apps, and perform device-specific operations"
+---
+
+The device utilities screen provides tools for managing your connected iOS device. Access it by clicking **Utilities** on the main screen.
+
+## Device information
+
+When you open utilities with a device connected, you'll see:
+
+- **Device name**: The name set on your iOS device
+- **UDID**: Universal Device Identifier for your device
+
+<Warning>
+macOS devices cannot be used with device utilities. Only iOS devices are supported.
+</Warning>
+
+## Pairing and trust
+
+### Trust device
+
+Establish a pairing relationship with your device:
+
+<Steps>
+
+<Step title="Click Trust Device">
+  Press the **Trust Device** button on the utilities screen.
+</Step>
+
+<Step title="Wait for pairing">
+  The button changes to "Pairing..." while the operation completes.
+  
+  This process:
+  - Establishes a trusted connection
+  - Allows app installation and file access
+  - Must be done on first connection
+</Step>
+
+<Step title="Check the result">
+  - **Success**: Green message confirms "Device paired successfully!"
+  - **Error**: Red message displays the error details
+</Step>
+
+</Steps>
+
+<Tip>
+You typically only need to trust a device once. However, if you see pairing errors during installation, try running Trust Device again.
+</Tip>
+
+## View installed apps
+
+Refresh and view the list of developer-signed apps on your device.
+
+### Refresh app list
+
+<Steps>
+
+<Step title="Click Refresh Installed Apps">
+  Press the **Refresh Installed Apps** button. It shows "Loading..." during the operation.
+</Step>
+
+<Step title="Wait for app discovery">
+  The system queries your device for all apps with developer signatures.
+</Step>
+
+<Step title="View results">
+  Installed apps appear in a scrollable list showing:
+  - App name and bundle identifier
+  - **Install Pairing** button for each app
+</Step>
+
+</Steps>
+
+### App list behavior
+
+- Only shows apps with developer certificates/provisioning profiles
+- Does not include App Store apps
+- List persists until you refresh or change devices
+- Empty list means no developer apps are installed
+
+<Info>
+The app list only includes applications installed with developer signatures (like those installed via Impactor). System apps and App Store apps are not shown.
+</Info>
+
+## Install pairing files
+
+Pairing files enable apps to access device-pairing certificates for certain operations.
+
+### What are pairing files?
+
+A pairing file allows an app to:
+- Maintain persistent pairing with your device
+- Access pairing certificates even after expiration
+- Communicate with device services
+
+### Installation process
+
+<Steps>
+
+<Step title="Refresh installed apps">
+  Click **Refresh Installed Apps** to populate the app list.
+</Step>
+
+<Step title="Select an app">
+  Find the app you want to install a pairing file for in the list.
+</Step>
+
+<Step title="Click Install Pairing">
+  Press the **Install Pairing** button next to the app name.
+</Step>
+
+<Step title="Check status">
+  A status message appears below the app entry:
+  - **Green**: "Pairing file installed successfully!"
+  - **Red**: Error message with failure details
+</Step>
+
+</Steps>
+
+### When to use pairing files
+
+Install pairing files when:
+- An app requires device pairing for functionality
+- You're developing tools that interact with device services
+- An app displays pairing-related errors
+
+<Note>
+Not all apps need pairing files. Only install them when specifically required by the app or for development purposes.
+</Note>
+
+## Status messages
+
+The utilities screen uses color-coded status messages:
+
+- **Green text**: Successful operations
+- **Red text**: Errors and failures
+- **Gray text**: No device connected or neutral information
+
+### Common status messages
+
+| Message | Meaning |
+|---------|--------|
+| "Device paired successfully!" | Trust operation completed |
+| "Pairing file installed successfully!" | Pairing file copied to app |
+| "No device connected" | Device dropdown shows no device |
+| "macOS devices are not supported" | Connected device is a Mac |
+| "Failed to load apps: ..." | Error retrieving app list |
+| "Failed to pair: ..." | Trust operation failed |
+| "Failed to install pairing record: ..." | Pairing file installation failed |
+
+## Troubleshooting
+
+### No apps appear after refresh
+
+**Possible causes:**
+- No developer-signed apps installed on device
+- Device not properly paired
+- Communication error with device
+
+**Solutions:**
+1. Try **Trust Device** first
+2. Install at least one app via Impactor
+3. Ensure device is unlocked
+4. Reconnect the device
+
+### Trust Device fails
+
+**Possible causes:**
+- Device not trusted on iOS device
+- USB connection issues
+- Device locked or in restricted mode
+
+**Solutions:**
+1. Check your iOS device for a trust prompt
+2. Tap **Trust** on your device if prompted
+3. Try a different USB cable or port
+4. Restart the device and try again
+
+### Pairing file installation fails
+
+**Possible causes:**
+- App doesn't have the required pairing file path
+- Insufficient permissions
+- Device connection interrupted
+
+**Solutions:**
+1. Ensure the app was installed via Impactor (not from App Store)
+2. Try running **Trust Device** again
+3. Refresh the app list and retry
+4. Check that the device remains connected during installation
+
+### "macOS devices are not supported" error
+
+This appears when a Mac is detected in the device list. Utilities only work with iOS devices. Switch to an iOS device in the device dropdown.
+
+## Device connection handling
+
+### Automatic refresh on device change
+
+When you:
+- Connect a new device
+- Switch devices in the dropdown
+- Disconnect the current device
+
+The utilities screen automatically:
+- Refreshes the app list
+- Clears previous status messages
+- Updates device information
+
+### Loading states
+
+Operations show visual feedback:
+- **Trust Device** → "Pairing..."
+- **Refresh Installed Apps** → "Loading..."
+- Buttons are disabled during operations
+
+<Tip>
+Wait for operations to complete before switching screens or disconnecting your device.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+
+<Card title="Install apps" icon="download" href="/gui/sideloading-apps">
+  Learn how to install IPA files after setting up your device.
+</Card>
+
+<Card title="Configure settings" icon="gear" href="/gui/settings">
+  Manage Apple accounts and app preferences.
+</Card>
+
+</CardGroup>

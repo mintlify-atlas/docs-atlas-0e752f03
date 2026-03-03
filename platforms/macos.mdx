@@ -1,0 +1,115 @@
+---
+title: macOS
+description: Install and use Impactor on macOS with native Apple Silicon and Intel support
+---
+
+Impactor runs natively on macOS with full support for both Apple Silicon (M1/M2/M3) and Intel processors. The app is distributed as a universal binary that works seamlessly on all modern Mac systems.
+
+## Installation
+
+Impactor is available through multiple installation methods on macOS.
+
+<Steps>
+  <Step title="Install via Homebrew">
+    The easiest way to install Impactor is using Homebrew:
+    
+    ```bash
+    brew install --cask impactor
+    ```
+  </Step>
+  
+  <Step title="Install from releases">
+    Download the latest `.dmg` file from [GitHub releases](https://github.com/khcrysalis/PlumeImpactor/releases):
+    
+    1. Open the downloaded DMG file
+    2. Drag Impactor.app to your Applications folder
+    3. Launch Impactor from Applications or Spotlight
+  </Step>
+</Steps>
+
+## System requirements
+
+Impactor supports a wide range of macOS versions:
+
+- **Minimum version**: macOS 10.12 (Sierra)
+- **Recommended**: macOS 11.0 (Big Sur) or later
+- **Architecture**: Universal binary supporting both Apple Silicon and Intel
+
+<Info>
+  The universal binary runs natively on both Apple Silicon and Intel Macs, providing optimal performance on all systems.
+</Info>
+
+## Build requirements
+
+To build Impactor from source on macOS, you need:
+
+- [Rust](https://rustup.rs/) toolchain
+- [CMake](https://cmake.org/download/) and a C++ compiler
+- [Xcode](https://developer.apple.com/xcode/) or [Command Line Tools](https://developer.apple.com/download/all/)
+
+### Building from source
+
+```bash
+# Clone the repository
+git clone https://github.com/khcrysalis/PlumeImpactor.git
+cd PlumeImpactor
+
+# Build the GUI application
+cargo run --bin plumeimpactor
+
+# Build the CLI tool
+cargo run --bin plumesign -- <args>
+
+# Create a release build with app bundle
+make macos PROFILE=release BUNDLE=1
+```
+
+The built app bundle will be available in the `dist/` directory.
+
+## Apple Silicon sideloading
+
+On Apple Silicon Macs, Impactor can sideload applications directly to your Mac:
+
+<Info>
+  Impactor uses `libMobileGestalt.dylib` to obtain your Mac's UDID for Apple Silicon sideloading through the `plume_gestalt` crate.
+</Info>
+
+## Features
+
+Impactor on macOS includes all core features:
+
+- Sign and sideload iOS apps to connected devices
+- Auto-refresh functionality for keeping apps up to date
+- System tray integration for quick access
+- Native macOS UI with support for both light and dark modes
+- Keychain integration for secure credential storage
+
+## Troubleshooting
+
+### First launch security prompt
+
+If you see a security warning when first launching Impactor:
+
+1. Open **System Settings** > **Privacy & Security**
+2. Scroll down to find the message about Impactor being blocked
+3. Click **Open Anyway**
+4. Confirm by clicking **Open** in the dialog
+
+### Device not detected
+
+If your iOS device is not detected:
+
+1. Ensure your device is unlocked and you've tapped **Trust** when prompted
+2. Try disconnecting and reconnecting the device
+3. Restart Impactor
+4. Check that your USB cable supports data transfer (not just charging)
+
+### Certificate issues
+
+Impactor stores signing certificates locally. If you use multiple machines:
+
+<Warning>
+  Certificate keys are stored locally on your Mac. If you don't copy these keys to other machines, Impactor will create a new certificate, which counts against your Apple ID's certificate limit.
+</Warning>
+
+Certificate data is stored in your keychain and can be exported from the Settings page.

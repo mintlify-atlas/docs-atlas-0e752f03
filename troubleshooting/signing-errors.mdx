@@ -1,0 +1,418 @@
+---
+title: Code signing errors
+description: Solutions for certificate, provisioning profile, and app signing issues
+---
+
+## Certificate errors
+
+Code signing requires a valid certificate from Apple. Free developer accounts have limitations compared to paid accounts.
+
+### Certificate generation and management
+
+<Accordion title="Certificate PEM missing error">
+  Impactor couldn't find or generate certificate data.
+  
+  **Possible causes:**
+  - Certificate request failed
+  - Certificate wasn't properly stored
+  - Certificate file is corrupted
+  
+  **Solution:**
+  1. Check the `keys/<team_id>/key.pem` file in your Impactor config directory
+  2. Delete the key.pem file to force regeneration
+  3. Sign again - Impactor will create a new certificate
+  
+  Error types in code:
+  - `CertificatePemMissing`
+  - `Certificate(String)` errors
+</Accordion>
+
+<Accordion title="Too many certificates (Error 7460)">
+  Free Apple Developer accounts are limited to 2-3 active certificates at a time.
+  
+  **What happens:**
+  Impactor automatically attempts to revoke old certificates when you hit the limit.
+  
+  **If automatic revocation fails:**
+  1. Go to [developer.apple.com/account/resources/certificates](https://developer.apple.com/account/resources/certificates/list)
+  2. Sign in with your Apple ID
+  3. Manually revoke certificates you no longer need (look for ones named "AltStore" or with old dates)
+  4. Return to Impactor and try signing again
+  
+  <Warning>
+    Revoking a certificate will invalidate all apps signed with it. They'll need to be re-signed and reinstalled.
+  </Warning>
+</Accordion>
+
+<Accordion title="Certificate error with specific code/message">
+  Developer API errors include detailed information:
+  
+  Format: `Developer API error {result_code} (HTTP {http_code}): {message}`
+  
+  **Common result codes:**
+  - `7460` - Too many certificates
+  - Check the message for specific guidance from Apple
+  
+  **Solution:**
+  1. Read the error message carefully
+  2. Follow any instructions provided
+  3. Check [Apple's developer documentation](https://developer.apple.com) for the specific error
+</Accordion>
+
+### Certificate storage and reuse
+
+<Accordion title="Certificate not persisting between signings">
+  Impactor stores certificates in your config directory under `keys/<team_id>/key.pem`.
+  
+  **Solution:**
+  - Check that Impactor has write permissions to the config directory
+  - Verify the key.pem file exists after signing
+  - Don't delete the keys folder if you want to reuse certificates
+  
+  <Tip>
+    Certificates last 365 days. Keeping the key.pem file lets you reuse the same certificate without hitting Apple's limit.
+  </Tip>
+</Accordion>
+
+<Accordion title="Using certificates on multiple computers">
+  To use the same certificate on different machines:
+  
+  1. Locate the `keys/<team_id>/` folder in Impactor's config directory
+  2. Copy this folder to the same location on the new computer
+  3. Sign apps on the new machine - it will use the existing certificate
+  
+  This prevents hitting the certificate limit when using multiple computers.
+</Accordion>
+
+## Provisioning profile errors
+
+<Accordion title="Provisioning entitlements unknown">
+  Impactor couldn't determine the required entitlements for the app.
+  
+  **Possible causes:**
+  - App executable is missing or corrupted
+  - Entitlements in the binary are malformed
+  - Bundle structure is invalid
+  
+  **Solution:**
+  1. Verify the IPA is not corrupted
+  2. Try a different IPA file
+  3. Check that the app's executable exists in the bundle
+  4. Ensure the Info.plist has a valid CFBundleExecutable entry
+  
+  Error type: `ProvisioningEntitlementsUnknown`
+</Accordion>
+
+<Accordion title="Bundle identifier mismatch">
+  The provisioning profile doesn't match the app's bundle identifier.
+  
+  **What Impactor does:**
+  - Automatically appends your team ID to the bundle identifier
+  - Example: `com.app.name` becomes `com.app.name.TEAM123`
+  
+  **If you see this error:**
+  1. Don't manually set a custom identifier unless needed
+  2. Let Impactor handle bundle ID modifications
+  3. Check that you're not using a wildcard profile incorrectly
+</Accordion>
+
+<Accordion title="Device not registered in profile">
+  Your device must be registered with Apple to use the provisioning profile.
+  
+  **Solution:**
+  Impactor automatically registers your device, but if this fails:
+  1. Check your internet connection
+  2. Verify you're logged in with the correct Apple ID
+  3. Ensure your device is properly detected (see [Device detection](/troubleshooting/device-detection))
+  4. Try signing again - device registration happens during signing
+</Accordion>
+
+<Accordion title="App groups not configured">
+  Some apps require app groups for sharing data between extensions.
+  
+  **What Impactor does:**
+  - Automatically creates app groups when needed
+  - Assigns app groups to the app ID
+  - Appends your team ID to group names
+  
+  **For SideStore/AltStore:**
+  Impactor sets the `ALTAppGroups` key in Info.plist with the correct group names.
+  
+  If app groups fail to create, check the Developer API error message for details.
+</Accordion>
+
+## Entitlements and capabilities
+
+<Accordion title="Requesting special entitlements">
+  Some apps need specific entitlements like `increased-memory-limit` for emulators.
+  
+  **Solution:**
+  Impactor requests capabilities automatically based on the app's binary.
+  
+  **To request additional entitlements:**
+  1. Use the advanced signing options (if available in your version)
+  2. Provide a custom entitlements plist file
+  3. Impactor will merge these with the provisioning profile
+</Accordion>
+
+<Accordion title="Entitlements being stripped">
+  Free developer accounts cannot use certain entitlements.
+  
+  **Restricted entitlements:**
+  - App Store entitlements
+  - HealthKit (on some iOS versions)
+  - HomeKit
+  - Wireless accessory configuration
+  - And others...
+  
+  Apps may work with reduced functionality when these are removed.
+</Accordion>
+
+<Accordion title="Plugin and extension entitlements">
+  App extensions and plugins need their own entitlements.
+  
+  **What Impactor does:**
+  - Signs all app extensions (`.appex`) separately
+  - Signs frameworks and dylibs
+  - Handles plugin bundles
+  
+  <Note>
+    Extensions in the app bundle are automatically detected and signed with appropriate entitlements.
+  </Note>
+</Accordion>
+
+## Code signing process errors
+
+<Accordion title="Codesign error from apple-codesign-rs">
+  The signing process itself failed.
+  
+  **Common causes:**
+  - Binary architecture incompatibility
+  - Corrupted app bundle
+  - Invalid certificate
+  - Missing frameworks
+  
+  **Solution:**
+  1. Check the specific error message
+  2. Verify the IPA is valid for iOS devices
+  3. Ensure you're not trying to sign a macOS app as an iOS app
+  4. Try adhoc signing mode to test if the issue is certificate-related
+  
+  Error types: `Codesign(AppleCodesignError)`, `CodeSignBuilder`
+</Accordion>
+
+<Accordion title="MachO binary errors">
+  Issues with the app's executable binary.
+  
+  **Possible problems:**
+  - Invalid MachO header
+  - Unsupported architecture
+  - SDK version incompatibility
+  
+  **Solution:**
+  - Verify the app is built for iOS (not macOS or simulator)
+  - Check iOS version compatibility
+  - For Liquid Glass support (iOS 26.0+), Impactor modifies SDK version automatically
+</Accordion>
+
+<Accordion title="Signing multiple architectures">
+  Universal binaries contain multiple architectures (arm64, arm64e).
+  
+  **Solution:**
+  Impactor handles this automatically using `apple-codesign-rs`. Each architecture slice is signed separately then reassembled.
+  
+  If you see errors about specific architectures, the binary may be corrupted.
+</Accordion>
+
+## Signing modes
+
+<Accordion title="Adhoc signing vs certificate signing">
+  Impactor supports different signing modes:
+  
+  **Adhoc signing:**
+  - No Apple certificate needed
+  - Only works with AppSync installed on jailbroken devices
+  - Useful for testing
+  
+  **Certificate signing (PEM mode):**
+  - Uses Apple Developer certificate
+  - Works on non-jailbroken devices
+  - 7-day expiration (free accounts) or 1-year (paid accounts)
+  
+  **None mode:**
+  - Skips signing entirely
+  - Only for advanced users
+</Accordion>
+
+<Accordion title="Single profile vs per-bundle signing">
+  Apps with extensions need multiple provisioning profiles.
+  
+  **Single profile mode:**
+  - One profile for the entire app
+  - Faster but may not work with complex apps
+  
+  **Per-bundle mode (default):**
+  - Separate profiles for app and each extension
+  - Required for most apps with extensions
+  - Automatically used unless single profile mode is enabled
+</Accordion>
+
+## Special app types
+
+<Accordion title="SideStore and AltStore signing">
+  These apps require special handling:
+  
+  **What Impactor does:**
+  - Embeds P12 certificate in the app
+  - Sets `ALTCertificateID` in Info.plist
+  - Configures app groups for the app
+  
+  The embedded certificate allows these apps to sign other apps on-device.
+</Accordion>
+
+<Accordion title="LiveContainer + SideStore">
+  This combination uses the SideStore framework within LiveContainer.
+  
+  **Solution:**
+  Impactor detects `SideStoreApp.framework` and:
+  1. Embeds certificate in the framework
+  2. Sets certificate ID
+  3. Configures both apps properly
+</Accordion>
+
+<Accordion title="Tweaked apps with ElleKit">
+  Apps with injected tweaks need special signing.
+  
+  **What Impactor does:**
+  - Installs ElleKit framework
+  - Signs injected dylibs
+  - Configures injection entitlements
+  - Handles .deb extraction and installation
+  
+  **If tweak injection fails:**
+  - Check the tweak is compatible with ElleKit
+  - Verify the tweak file is not corrupted
+  - Ensure the tweak supports your iOS version
+  
+  Error type: `TweakExtractionFailed`, `UnsupportedFileType`
+</Accordion>
+
+## Developer account limitations
+
+### Free developer account restrictions
+
+<Warning>
+  Free Apple Developer accounts have several limitations compared to paid accounts.
+</Warning>
+
+**Limitations:**
+- Maximum 2-3 certificates at once
+- Maximum 10 app IDs (bundle identifiers)
+- Maximum 3 devices registered (some accounts)
+- 7-day app expiration (vs 1 year for paid)
+- Cannot use certain entitlements
+
+**Working within limits:**
+1. Reuse certificates across signings (don't delete key.pem)
+2. Revoke old certificates when needed
+3. Use the same bundle identifiers when possible
+4. Re-sign apps weekly using auto-refresh apps like SideStore
+
+## Cryptographic errors
+
+<Accordion title="RSA, PKCS1, PKCS8 errors">
+  Issues with key formats and encoding.
+  
+  **Possible causes:**
+  - Corrupted key file
+  - Wrong key format
+  - Key encryption issues
+  
+  **Solution:**
+  1. Delete the `key.pem` file
+  2. Let Impactor generate a new key pair
+  3. Don't manually edit certificate files
+  
+  Error types: `Rsa`, `PKCS1`, `PKCS8`
+</Accordion>
+
+<Accordion title="X509 certificate errors">
+  Problems parsing or validating certificates.
+  
+  **Solution:**
+  - Ensure you're using certificates from Apple's Developer Portal
+  - Don't use expired certificates
+  - Let Impactor manage certificate creation
+  
+  Error type: `X509(X509CertificateError)`
+</Accordion>
+
+<Accordion title="P12 export errors">
+  Issues creating P12 files for SideStore/AltStore.
+  
+  **Solution:**
+  The P12 is generated automatically during signing. If export fails:
+  1. Ensure the certificate was created successfully
+  2. Check that Impactor has write permissions
+  3. Try signing again
+</Accordion>
+
+## Advanced troubleshooting
+
+<Accordion title="Enable detailed signing logs">
+  Impactor uses Rust's `log` crate for logging.
+  
+  To see detailed signing information, run Impactor with:
+  ```bash
+  RUST_LOG=debug impactor
+  ```
+  
+  This shows:
+  - Certificate requests
+  - Provisioning profile creation
+  - Signing operations
+  - API communications
+</Accordion>
+
+<Accordion title="Inspect provisioning profiles">
+  To manually check a provisioning profile:
+  
+  ```bash
+  security cms -D -i embedded.mobileprovision
+  ```
+  
+  This shows the profile's entitlements, devices, and expiration.
+</Accordion>
+
+<Accordion title="Verify signature after signing">
+  Check if signing was successful:
+  
+  ```bash
+  codesign -dvvv /path/to/app.app
+  ```
+  
+  Look for:
+  - Valid signature
+  - Correct team identifier
+  - Entitlements present
+</Accordion>
+
+## Still having signing issues?
+
+If you continue to have problems:
+
+1. Try adhoc signing to isolate certificate issues
+2. Test with a simple app (like a small utility app)
+3. Verify your Apple ID works at [developer.apple.com](https://developer.apple.com)
+4. Check if your account has any restrictions
+5. Review [common issues](/troubleshooting/common-issues) for related problems
+6. Search [GitHub Issues](https://github.com/khcrysalis/PlumeImpactor/issues) for your specific error
+
+<Tip>
+  When reporting signing errors, include:
+  - The complete error message
+  - Your signing mode (adhoc, certificate, etc.)
+  - Whether you have a free or paid developer account
+  - The app you're trying to sign
+  - Any custom signing options you're using
+</Tip>

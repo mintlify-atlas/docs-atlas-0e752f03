@@ -1,0 +1,370 @@
+---
+title: Signer API
+description: High-level iOS app signing orchestration with plume_utils::Signer
+---
+
+The `Signer` struct orchestrates the complete iOS app signing process, including bundle modification, provisioning profile generation, and code signing.
+
+## Signer struct
+
+```rust
+pub struct Signer {
+    certificate: Option<CertificateIdentity>,
+    pub options: SignerOptions,
+    pub provisioning_files: Vec<MobileProvision>,
+}
+```
+
+<ParamField path="certificate" type="Option<CertificateIdentity>">
+  Code signing certificate and private key (not needed for adhoc signing)
+</ParamField>
+
+<ParamField path="options" type="SignerOptions">
+  Configuration for the signing operation
+</ParamField>
+
+<ParamField path="provisioning_files" type="Vec<MobileProvision>">
+  Provisioning profiles generated or loaded during signing
+</ParamField>
+
+## Creating a signer
+
+<CodeGroup>
+```rust Basic signer
+use plume_utils::{Signer, SignerOptions};
+
+let options = SignerOptions::default();
+let signer = Signer::new(None, options);
+```
+
+```rust With certificate
+use plume_core::CertificateIdentity;
+use plume_utils::{Signer, SignerOptions};
+
+let cert = CertificateIdentity::load_from_pem(cert_pem, key_pem)?;
+let signer = Signer::new(Some(cert), options);
+```
+
+```rust For specific app
+use plume_utils::{Signer, SignerOptions, SignerApp};
+
+let options = SignerOptions::new_for_app(SignerApp::SideStore);
+let signer = Signer::new(None, options);
+```
+</CodeGroup>
+
+## Methods
+
+### new
+
+```rust
+pub fn new(
+    certificate: Option<CertificateIdentity>,
+    options: SignerOptions
+) -> Self
+```
+
+Creates a new signer instance with the specified certificate and options.
+
+### modify_bundle
+
+```rust
+pub async fn modify_bundle(
+    &mut self,
+    bundle: &Bundle,
+    team_id: &Option<String>,
+) -> Result<(), Error>
+```
+
+Modifies the app bundle according to the signer options. This includes:
+
+- Changing app name, version, and bundle identifier
+- Setting minimum OS version
+- Enabling features (file sharing, iPad fullscreen, game mode, ProMotion)
+- Injecting custom icons
+- Installing tweaks and ElleKit
+- Embedding certificate for sideloading apps
+- Liquid Glass support (SDK version modification)
+
+<Expandable title="Supported modifications">
+  <ResponseField name="custom_name" type="String">
+    Changes CFBundleDisplayName and CFBundleName
+  </ResponseField>
+  
+  <ResponseField name="custom_version" type="String">
+    Changes CFBundleShortVersionString and CFBundleVersion
+  </ResponseField>
+  
+  <ResponseField name="custom_identifier" type="String">
+    Changes CFBundleIdentifier for main app and nested bundles
+  </ResponseField>
+  
+  <ResponseField name="custom_icon" type="PathBuf">
+    Replaces app icons with custom image
+  </ResponseField>
+  
+  <ResponseField name="features.support_file_sharing" type="bool">
+    Enables UIFileSharingEnabled and UISupportsDocumentBrowser
+  </ResponseField>
+  
+  <ResponseField name="features.support_game_mode" type="bool">
+    Enables GCSupportsGameMode
+  </ResponseField>
+  
+  <ResponseField name="features.support_pro_motion" type="bool">
+    Enables CADisableMinimumFrameDurationOnPhone for 120Hz displays
+  </ResponseField>
+  
+  <ResponseField name="features.support_liquid_glass" type="bool">
+    Modifies SDK version for dynamic island support
+  </ResponseField>
+  
+  <ResponseField name="features.support_ellekit" type="bool">
+    Installs ElleKit tweak injection framework
+  </ResponseField>
+</Expandable>
+
+<CodeGroup>
+```rust Example
+let mut signer = Signer::new(None, options);
+let bundle = Bundle::new("/path/to/App.app")?;
+
+signer.modify_bundle(&bundle, &Some(team_id)).await?;
+```
+</CodeGroup>
+
+### register_bundle
+
+```rust
+pub async fn register_bundle(
+    &mut self,
+    bundle: &Bundle,
+    session: &DeveloperSession,
+    team_id: &String,
+    is_refresh: bool,
+) -> Result<(), Error>
+```
+
+Registers the app bundle with Apple's Developer API and generates provisioning profiles. This method:
+
+- Creates app IDs for the main app and extensions
+- Enables required capabilities based on entitlements
+- Creates and assigns app groups
+- Generates provisioning profiles
+- Embeds profiles in the bundle
+
+<ParamField path="bundle" type="&Bundle">
+  The app bundle to register
+</ParamField>
+
+<ParamField path="session" type="&DeveloperSession">
+  Authenticated developer session
+</ParamField>
+
+<ParamField path="team_id" type="&String">
+  Apple Developer team ID
+</ParamField>
+
+<ParamField path="is_refresh" type="bool">
+  Whether this is refreshing an existing app (preserves app group names)
+</ParamField>
+
+<CodeGroup>
+```rust Example
+use plume_core::developer::DeveloperSession;
+
+let session = DeveloperSession::using_account(account).await?;
+let teams = session.qh_list_teams().await?;
+let team_id = &teams.teams[0].team_id;
+
+signer.register_bundle(
+    &bundle,
+    &session,
+    team_id,
+    false  // not a refresh
+).await?;
+```
+</CodeGroup>
+
+### sign_bundle
+
+```rust
+pub async fn sign_bundle(&self, bundle: &Bundle) -> Result<(), Error>
+```
+
+Performs code signing on the bundle and all nested components. Signs in the correct order (deepest bundles first):
+
+1. Frameworks and dylibs
+2. App extensions
+3. Main app bundle
+
+<CodeGroup>
+```rust Example
+signer.sign_bundle(&bundle).await?;
+println!("Bundle signed successfully");
+```
+</CodeGroup>
+
+## Signing modes
+
+```rust
+pub enum SignerMode {
+    Pem,    // Sign with Apple Developer account
+    Adhoc,  // Adhoc signing (no developer account)
+    None,   // No modifications
+}
+```
+
+<Expandable title="Mode descriptions">
+  <ResponseField name="Pem" type="unit">
+    Full signing with Apple Developer provisioning profiles. Requires DeveloperSession.
+  </ResponseField>
+  
+  <ResponseField name="Adhoc" type="unit">
+    Local adhoc signing without Apple Developer account. Apps work on jailbroken devices only.
+  </ResponseField>
+  
+  <ResponseField name="None" type="unit">
+    Skip signing, only apply modifications from SignerOptions.
+  </ResponseField>
+</Expandable>
+
+## Signing options
+
+```rust
+pub struct SignerOptions {
+    pub custom_name: Option<String>,
+    pub custom_identifier: Option<String>,
+    pub custom_version: Option<String>,
+    pub custom_icon: Option<PathBuf>,
+    pub custom_entitlements: Option<PathBuf>,
+    pub features: SignerFeatures,
+    pub embedding: SignerEmbedding,
+    pub mode: SignerMode,
+    pub install_mode: SignerInstallMode,
+    pub tweaks: Option<Vec<PathBuf>>,
+    pub app: SignerApp,
+    pub refresh: bool,
+}
+```
+
+### SignerFeatures
+
+```rust
+pub struct SignerFeatures {
+    pub support_minimum_os_version: bool,
+    pub support_file_sharing: bool,
+    pub support_ipad_fullscreen: bool,
+    pub support_game_mode: bool,
+    pub support_pro_motion: bool,
+    pub support_liquid_glass: bool,
+    pub support_ellekit: bool,
+    pub remove_url_schemes: bool,
+}
+```
+
+### SignerEmbedding
+
+```rust
+pub struct SignerEmbedding {
+    pub single_profile: bool,  // Use one profile for all bundles
+}
+```
+
+### SignerApp
+
+```rust
+pub enum SignerApp {
+    Default,
+    Antrag,
+    Feather,
+    Protokolle,
+    AltStore,
+    SideStore,
+    LiveContainer,
+    LiveContainerAndSideStore,
+    StikDebug,
+    SparseBox,
+    EnsWilde,
+    ByeTunes,
+    StikStore,
+}
+```
+
+Special handling for specific sideloading apps (certificate embedding, pairing file paths, etc.).
+
+## Complete example
+
+<CodeGroup>
+```rust Full signing workflow
+use plume_core::auth::Account;
+use plume_core::developer::DeveloperSession;
+use plume_utils::{
+    Bundle, Signer, SignerOptions, SignerMode,
+    SignerFeatures, SignerApp
+};
+use omnisette::AnisetteConfiguration;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 1. Authenticate
+    let account = Account::login(
+        || Ok(("user@icloud.com".to_string(), "password".to_string())),
+        || Ok("123456".to_string()),
+        AnisetteConfiguration::default()
+    ).await?;
+    
+    // 2. Get developer session and team
+    let session = DeveloperSession::using_account(account).await?;
+    let teams = session.qh_list_teams().await?;
+    let team_id = teams.teams[0].team_id.clone();
+    
+    // 3. Load bundle
+    let bundle = Bundle::new("/path/to/MyApp.app")?;
+    
+    // 4. Configure options
+    let mut options = SignerOptions::default();
+    options.mode = SignerMode::Pem;
+    options.custom_name = Some("Custom Name".to_string());
+    options.custom_version = Some("1.0.0".to_string());
+    options.features.support_file_sharing = true;
+    options.features.support_pro_motion = true;
+    options.app = SignerApp::Default;
+    
+    // 5. Create signer and sign
+    let mut signer = Signer::new(None, options);
+    
+    // Modify bundle (name, version, features)
+    signer.modify_bundle(&bundle, &Some(team_id.clone())).await?;
+    
+    // Register with Apple and get provisioning profiles
+    signer.register_bundle(&bundle, &session, &team_id, false).await?;
+    
+    // Sign all bundles
+    signer.sign_bundle(&bundle).await?;
+    
+    println!("✓ Bundle signed successfully!");
+    
+    Ok(())
+}
+```
+</CodeGroup>
+
+## Special app support
+
+The signer has special handling for popular sideloading apps:
+
+<CodeGroup>
+```rust SideStore support
+let mut options = SignerOptions::new_for_app(SignerApp::SideStore);
+// Automatically:
+// - Embeds certificate for app refresh
+// - Sets single_profile = true
+// - Configures pairing file path
+```
+
+```rust LiveContainer support
+let options = SignerOptions::new_for_app(SignerApp::LiveContainer);
+// Enables single provisioning profile mode
+```
+</CodeGroup>

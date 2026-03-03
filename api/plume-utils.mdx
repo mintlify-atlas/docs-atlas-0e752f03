@@ -1,0 +1,188 @@
+---
+title: plume_utils
+description: High-level utilities for iOS app signing, bundling, and device management
+---
+
+The `plume_utils` crate provides high-level utilities for signing iOS applications, managing bundles, and interacting with iOS devices. It builds on top of `plume_core` to provide a complete signing workflow.
+
+## Overview
+
+This crate contains:
+
+- **Signer** - High-level app signing orchestration
+- **Bundle** - iOS app bundle parsing and modification
+- **Device** - iOS device management and app installation
+- **SignerOptions** - Configuration for signing operations
+- **Package** - IPA package creation and extraction
+- **Tweak** - Jailbreak tweak injection
+
+## Exports
+
+```rust
+pub use bundle::{Bundle, BundleType};
+pub use device::{Device, get_device_for_id, install_app_mac};
+pub use options::{
+    SignerApp,
+    SignerAppReal,
+    SignerEmbedding,
+    SignerFeatures,
+    SignerInstallMode,
+    SignerMode,
+    SignerOptions,
+};
+pub use package::Package;
+pub use signer::Signer;
+pub use tweak::Tweak;
+```
+
+## Error type
+
+```rust
+pub enum Error {
+    BundleInfoPlistMissing,
+    BundleFailedToCopy(String),
+    TweakInvalidPath,
+    TweakExtractionFailed(String),
+    UnsupportedFileType(String),
+    PackageInfoPlistMissing,
+    Io(std::io::Error),
+    Plist(plist::Error),
+    Core(plume_core::Error),
+    Idevice(idevice::IdeviceError),
+    Codesign(AppleCodesignError),
+    Other(String),
+    Image(image::ImageError),
+}
+```
+
+<Expandable title="Error variants">
+  <ResponseField name="BundleInfoPlistMissing" type="unit">
+    The bundle's Info.plist file could not be found
+  </ResponseField>
+  
+  <ResponseField name="TweakInvalidPath" type="unit">
+    The provided tweak file path is invalid
+  </ResponseField>
+  
+  <ResponseField name="UnsupportedFileType" type="String">
+    The file type is not supported for this operation
+  </ResponseField>
+  
+  <ResponseField name="Core" type="plume_core::Error">
+    Error from the underlying plume_core crate
+  </ResponseField>
+  
+  <ResponseField name="Idevice" type="IdeviceError">
+    Error communicating with iOS device
+  </ResponseField>
+</Expandable>
+
+## PlistInfoTrait
+
+A trait for extracting information from Info.plist files.
+
+```rust
+pub trait PlistInfoTrait {
+    fn get_name(&self) -> Option<String>;
+    fn get_executable(&self) -> Option<String>;
+    fn get_bundle_identifier(&self) -> Option<String>;
+    fn get_bundle_name(&self) -> Option<String>;
+    fn get_version(&self) -> Option<String>;
+    fn get_build_version(&self) -> Option<String>;
+}
+```
+
+## Helper functions
+
+<ParamField path="copy_dir_recursively" type="async fn">
+  ```rust
+  pub async fn copy_dir_recursively(
+      src: &Path,
+      dst: &Path
+  ) -> Result<(), Error>
+  ```
+  
+  Recursively copies a directory and all its contents, preserving symlinks on Unix systems
+</ParamField>
+
+<CodeGroup>
+```rust Example
+use plume_utils::copy_dir_recursively;
+use std::path::Path;
+
+copy_dir_recursively(
+    Path::new("/source/app.app"),
+    Path::new("/dest/app.app")
+).await?;
+```
+</CodeGroup>
+
+## Complete signing workflow
+
+Here's an example of the complete workflow using multiple components:
+
+<CodeGroup>
+```rust Full example
+use plume_core::auth::Account;
+use plume_core::developer::DeveloperSession;
+use plume_utils::{
+    Bundle, Signer, SignerOptions, SignerMode,
+    Device, get_device_for_id
+};
+use std::path::PathBuf;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 1. Authenticate
+    let account = Account::login(
+        || Ok(("user@icloud.com".to_string(), "password".to_string())),
+        || Ok("123456".to_string()),
+        omnisette::AnisetteConfiguration::default()
+    ).await?;
+    
+    // 2. Create developer session
+    let session = DeveloperSession::using_account(account).await?;
+    let teams = session.qh_list_teams().await?;
+    let team_id = &teams.teams[0].team_id;
+    
+    // 3. Load bundle
+    let bundle = Bundle::new("/path/to/App.app")?;
+    
+    // 4. Configure signing
+    let mut options = SignerOptions::default();
+    options.mode = SignerMode::Pem;
+    options.custom_name = Some("My Custom App".to_string());
+    
+    // 5. Sign
+    let mut signer = Signer::new(None, options);
+    signer.modify_bundle(&bundle, &Some(team_id.clone())).await?;
+    signer.register_bundle(&bundle, &session, team_id, false).await?;
+    signer.sign_bundle(&bundle).await?;
+    
+    // 6. Install to device
+    let device = get_device_for_id("12345").await?;
+    device.install_app(
+        &PathBuf::from("/path/to/App.app"),
+        |progress| async move {
+            println!("Progress: {}%", progress);
+        }
+    ).await?;
+    
+    Ok(())
+}
+```
+</CodeGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Signer API" icon="signature" href="/api/signer">
+    Learn about the high-level signing API
+  </Card>
+  <Card title="Bundle API" icon="box" href="/api/bundle">
+    Work with iOS app bundles
+  </Card>
+  <Card title="Device API" icon="mobile" href="/api/device">
+    Manage iOS devices and installation
+  </Card>
+</CardGroup>
