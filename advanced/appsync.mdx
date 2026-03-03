@@ -91,16 +91,9 @@ if self.options.mode == SignerMode::None {
   </Step>
 </Steps>
 
-### CLI method
-
-```bash
-plumesign sign \
-  --input app.ipa \
-  --mode none \
-  --device-id <device_id>
-```
-
-This installs the app without any modifications.
+<Note>
+  AppSync support in the CLI is not currently available. Use the GUI application to install apps with AppSync.
+</Note>
 
 ## Benefits of AppSync
 
@@ -139,39 +132,24 @@ Even when using AppSync, you can still use Impactor's features:
 
 ### Tweak injection
 
-```bash
-plumesign sign \
-  --input app.ipa \
-  --mode none \
-  --tweak custom.deb \
-  --device-id <device_id>
-```
+Tweak injection with AppSync is available in the GUI:
+1. Select your IPA file
+2. Add tweaks in the "Tweaks" section
+3. Set signing mode to "No Modify" (AppSync)
+4. Install to your device
 
 ElleKit and tweaks are injected, then the app is installed without signing.
 
 ### Bundle modifications
 
 ```rust
-// From plume_utils/src/signer.rs:44
-if let Some(new_name) = self.options.custom_name.as_ref() {
-    bundle.set_name(new_name)?;
-}
-
-if let Some(new_version) = self.options.custom_version.as_ref() {
-    bundle.set_version(new_version)?;
+// From plume_utils/src/signer.rs:34
+if self.options.mode == SignerMode::None {
+    return Ok(());
 }
 ```
 
-Custom names, versions, and icons are applied even in "No Modify" mode.
-
-### Feature flags
-
-All feature flags work with AppSync:
-- File sharing
-- iPad fullscreen
-- Game Mode
-- ProMotion
-- Liquid Glass (iOS 26.0 compatibility)
+When using "No Modify" mode (AppSync), all bundle modifications are skipped. The IPA is installed completely unmodified to preserve the original app structure.
 
 ## Adhoc signing vs AppSync
 
@@ -204,34 +182,21 @@ pub async fn sign_bundle(&self, bundle: &Bundle) -> Result<(), Error> {
 
 The entire signing pipeline is skipped.
 
-### Bundle modifications still apply
+### Installation without modification
 
-Even without signing, Impactor applies bundle modifications:
+When SignerMode::None is selected, Impactor skips all modifications:
 
 ```rust
-// From plume_utils/src/signer.rs:28
-pub async fn modify_bundle(
-    &mut self,
-    bundle: &Bundle,
-    team_id: &Option<String>,
-) -> Result<(), Error> {
+// From plume_utils/src/signer.rs:34
+pub async fn modify_bundle(&mut self, bundle: &Bundle, team_id: &Option<String>) -> Result<(), Error> {
     if self.options.mode == SignerMode::None {
-        return Ok(()); // Skip modifications if mode is None
+        return Ok(());
     }
-    // Actually, modifications are NOT skipped!
+    // ... modification code only runs when mode is not None
 }
 ```
 
-Wait, that's not quite right. Let me check the actual implementation:
-
-```rust
-// From plume_utils/src/signer.rs:33
-if self.options.mode == SignerMode::None {
-    return Ok(());
-}
-```
-
-Actually, modifications ARE skipped when mode is `None`. The IPA is installed completely unmodified.
+The IPA is installed completely unmodified, preserving the original app structure and entitlements.
 
 ### Installation process
 
