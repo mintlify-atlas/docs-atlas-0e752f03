@@ -1,0 +1,144 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Impactor",
+  "projectDescription": "Cross-platform iOS sideloading application with GUI and CLI interfaces for signing and installing apps.",
+  "theme": "aspen",
+  "primaryColor": "#C96FAD",
+  "lightColor": "#E8A5C8",
+  "darkColor": "#A855A0",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/how-it-works",
+              "concepts/certificates",
+              "concepts/provisioning-profiles",
+              "concepts/pairing-files"
+            ]
+          },
+          {
+            "group": "GUI Application",
+            "pages": [
+              "gui/overview",
+              "gui/sideloading-apps",
+              "gui/device-utilities",
+              "gui/settings"
+            ]
+          },
+          {
+            "group": "CLI Reference",
+            "pages": [
+              "cli/overview",
+              "cli/sign",
+              "cli/account",
+              "cli/device",
+              "cli/macho"
+            ]
+          },
+          {
+            "group": "Advanced Features",
+            "pages": [
+              "advanced/tweaks",
+              "advanced/pairing-file-generation",
+              "advanced/p12-export",
+              "advanced/entitlements",
+              "advanced/appsync"
+            ]
+          },
+          {
+            "group": "Platform Guides",
+            "pages": [
+              "platforms/macos",
+              "platforms/linux",
+              "platforms/windows"
+            ]
+          },
+          {
+            "group": "Troubleshooting",
+            "pages": [
+              "troubleshooting/common-issues",
+              "troubleshooting/device-detection",
+              "troubleshooting/signing-errors"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core Library",
+            "pages": [
+              "api/plume-core",
+              "api/auth",
+              "api/developer-api"
+            ]
+          },
+          {
+            "group": "Utilities",
+            "pages": [
+              "api/plume-utils",
+              "api/signer",
+              "api/bundle",
+              "api/device"
+            ]
+          },
+          {
+            "group": "Store",
+            "pages": [
+              "api/plume-store"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Contributing",
+        "groups": [
+          {
+            "group": "Development",
+            "pages": [
+              "contributing/overview",
+              "contributing/building",
+              "contributing/architecture"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Cross-platform iOS sideloading (macOS, Linux, Windows)",
+    "Sign and install apps with Apple ID authentication",
+    "GUI and CLI interfaces for flexible workflows",
+    "Tweak injection support with ElleKit",
+    "P12 certificate generation for SideStore/AltStore",
+    "Pairing file generation for remote device management",
+    "Advanced entitlement handling and plugin registration",
+    "Device utilities for retrusting and pairing file placement"
+  ],
+  "publicApiSurface": [
+    "plumesign sign - Sign iOS app bundles",
+    "plumesign account - Manage Apple Developer accounts",
+    "plumesign device - Device management commands",
+    "plumesign macho - Inspect Mach-O binaries",
+    "plume_core::auth - Apple account authentication",
+    "plume_core::developer - Apple Developer API client",
+    "plume_utils::Signer - Code signing implementation",
+    "plume_utils::Bundle - App bundle handling",
+    "plume_utils::Device - Device communication",
+    "plume_utils::Tweak - Tweak injection",
+    "plume_store::AccountStore - Account persistence"
+  ]
+}
